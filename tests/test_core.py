@@ -244,3 +244,10 @@ def test_phone_parsing_rejects_foreign_years_and_country_code_prefix():
 def test_facebook_p_links_keep_their_slug():
     p = page("", links=[("https://www.facebook.com/p/Fidi-Video-100063/", ""), ("https://www.facebook.com/policies/", "")])
     assert [x[2] for x in sp.socials(p)] == ["p/Fidi-Video-100063"]
+
+
+def test_source_has_no_control_characters():
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1] / "kildespor"
+    bad = [str(p) for p in root.rglob("*.py") if any(c in p.read_text(encoding="utf-8") for c in "\x08\x0c\x0b")]
+    assert bad == []

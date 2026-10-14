@@ -283,7 +283,15 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--envelopes", required=True)
     v.add_argument("--report")
     v.add_argument("--out", required=True)
+    vf = sub.add_parser("verify", help="check every evidence hash and quoted span against the archived raw responses")
+    vf.add_argument("--envelopes", required=True)
+    vf.add_argument("--archive")
     args = ap.parse_args(argv)
+    if args.cmd == "verify":
+        from .verify import verify_run
+        rep = verify_run(Path(args.envelopes), Path(args.archive) if args.archive else None)
+        print(json.dumps(rep, ensure_ascii=False, indent=2))
+        return 0 if rep["hash_in_archive"] == rep["evidence_records"] else 1
     if args.cmd == "view":
         from .viewer import write_viewer
         envs = [json.loads(x) for x in Path(args.envelopes).read_text(encoding="utf-8").splitlines() if x.strip()]

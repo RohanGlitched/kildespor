@@ -19,12 +19,22 @@ That writes:
 | `out/envelopes.jsonl` | one terminal envelope per input, in input order ([schema](DATA_SCHEMA.md)) |
 | `out/run-report.json` | counts, coverage by field family, validation checks, requests, p50/p95, cost |
 | `out/viewer/index.html` | a static viewer: search, filter, compare, open every source (works from disk) |
-| `out/snapshots/` | gzip copies of every fetched response, named by SHA-256 |
+| `out/snapshots.zip` | every response behind a published fact, one entry per SHA-256 |
 | `out/history/` | the previous run's envelopes after a refresh |
 
 Running the same command again with the same output directory is a **refresh**: every fact is
 matched to the previous run by a stable key, changes are reported with evidence for both sides,
 and facts whose source failed this time are kept, marked as carried forward.
+
+## Check the evidence yourself
+
+```bash
+.venv/bin/python -m kildespor verify --envelopes out/envelopes.jsonl
+```
+
+Every evidence record carries the SHA-256 of the bytes we fetched. `verify` opens `snapshots.zip`,
+confirms each hash is there, and checks that each quoted span from a web page really occurs in the
+archived page.
 
 ## Requirements
 

@@ -88,7 +88,7 @@ class NavJobs(Source):
         self.index_complete = not pending
 
     async def _walk(self, ctx, start: datetime, stop: datetime | None) -> None:
-        f = await ctx.client.get(self.name, BASE + "/api/v1/feed", retries=3, timeout=45,
+        f = await ctx.client.get("nav_jobs_index", BASE + "/api/v1/feed", retries=3, timeout=45,
                                  headers=self._h({"If-Modified-Since": format_datetime(start, usegmt=True)}), check_robots=False)
         for _ in range(400):
             if not f.ok:
@@ -109,13 +109,13 @@ class NavJobs(Source):
             nxt = page.get("next_url")
             if not nxt or not page.get("items"):
                 return
-            f = await ctx.client.get(self.name, BASE + nxt, headers=self._h(), check_robots=False, retries=3, timeout=45)
+            f = await ctx.client.get("nav_jobs_index", BASE + nxt, headers=self._h(), check_robots=False, retries=3, timeout=45)
 
     async def _detail(self, ctx, uuid: str) -> tuple[dict | None, object]:
         if uuid in self.detail_cache:
             return self.detail_cache[uuid]
         async with self.sem:
-            f = await ctx.client.get(self.name, f"{BASE}/api/v1/feedentry/{uuid}", headers=self._h(), check_robots=False,
+            f = await ctx.client.get("nav_jobs_index", f"{BASE}/api/v1/feedentry/{uuid}", headers=self._h(), check_robots=False,
                                      retries=1, timeout=20)
         self.details += 1
         out = (json.loads(f.body), f) if f.ok else (None, f)
@@ -172,6 +172,7 @@ class NavJobs(Source):
             if org not in own:
                 continue
             hit += 1
+            ctx.client.save_snapshot(f)
             status = d.get("status") or self.ads[uuid].get("status")
             locs = ", ".join(sorted({(x.get("city") or x.get("municipal") or "").title() for x in ad.get("workLocations") or [] if x}))
             published = (ad.get("published") or "")[:10] or None

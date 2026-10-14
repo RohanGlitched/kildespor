@@ -211,7 +211,7 @@ def phones(page: Page) -> list[tuple[str, str]]:
         if href.lower().startswith("tel:"):
             d = _norwegian(unquote(href[4:]))
             if d:
-                out.setdefault(d, f"tel:{href[4:]} {text}")
+                out.setdefault(d, f"{href[4:]} · {text}" if text else href[4:])
     for m in PHONE_RE.finditer(page.text):
         before = page.text[max(0, m.start() - 14): m.start()]
         if re.search(r"fax|faks|telefaks", page.text[max(0, m.start() - 16): m.start()], re.I):

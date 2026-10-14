@@ -243,7 +243,10 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
                     if f" {' '.join(parts)} " in f_hay or (len(parts) > 2 and f" {parts[0]} {parts[-1]} " in f_hay):
                         hits.append(name)
                 if hits:
-                    res.proofs.append(Proof("role_holder_and_name", f"{', '.join(hits[:2])} (role register) and {ent.get('navn')} on the page",
+                    first = re.findall(r"[a-zæøå0-9]+", hits[0].lower())
+                    m = re.search(r"\b" + re.escape(first[0]) + r"\b.{0,40}" + re.escape(first[-1]), hay, re.I | re.S)
+                    excerpt = hay[max(0, m.start() - 40): m.end() + 40].replace("\n", " ") if m else hits[0]
+                    res.proofs.append(Proof("role_holder_and_name", excerpt,
                                             page.final_url, page.sha256, page.retrieved_at, 0.9 if len(hits) >= 2 else 0.88))
                     break
     if not ours_seen:

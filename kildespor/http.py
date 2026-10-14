@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import zipfile
 import gzip
 import ipaddress
 import socket
@@ -103,11 +104,26 @@ class Client:
         self.private_cache: dict[str, bool] = {}
         self.stats = Stats()
         self.snapshot_dir = snapshot_dir
+        self.archive: zipfile.ZipFile | None = None
+        self.archived: set[str] = set()
         if snapshot_dir:
-            snapshot_dir.mkdir(parents=True, exist_ok=True)
+            snapshot_dir.parent.mkdir(parents=True, exist_ok=True)
+            path = snapshot_dir.with_suffix(".zip")
+            if path.exists():
+                with zipfile.ZipFile(path) as z:
+                    self.archived = {n.split(".")[0] for n in z.namelist()}
+            self.archive = zipfile.ZipFile(path, "a", compression=zipfile.ZIP_DEFLATED, compresslevel=6)
+        self.no_snapshot_sources = {"robots", "nav_jobs_index"}
+
+    def save_snapshot(self, f: "Fetched") -> None:
+        if self.archive is not None and f.ok and f.body and f.sha256 not in self.archived:
+            self.archived.add(f.sha256)
+            self.archive.writestr(f"{f.sha256}.raw", f.body)
 
     async def close(self) -> None:
         await self.client.aclose()
+        if self.archive is not None:
+            self.archive.close()
 
     def _lock(self, host: str) -> asyncio.Semaphore:
         if host not in self.host_locks:
@@ -165,6 +181,7 @@ class Client:
                 except (httpx.HTTPError, OSError, ValueError) as exc:
                     f = Fetched(url, url, 0, utc_now(), error=type(exc).__name__, elapsed_ms=int((time.monotonic() - start) * 1000))
             self.stats.add(source, f)
+            self.save_snapshot(f)
             if f.ok or (f.status and f.status < 500 and f.status != 429):
                 break
             wait = 1.0 * (attempt + 1)
@@ -211,9 +228,7 @@ class Client:
                     f = Fetched(url, current, 0, utc_now(), error=type(exc).__name__, redirects=chain,
                                 elapsed_ms=int((time.monotonic() - start) * 1000))
             self.stats.add(source, f)
-            if f.ok and self.snapshot_dir and f.body and source not in ("robots",):
-                path = self.snapshot_dir / f"{f.sha256}.gz"
-                if not path.exists():
-                    path.write_bytes(gzip.compress(f.body, 6))
+            if source not in self.no_snapshot_sources:
+                self.save_snapshot(f)
             return f
         return Fetched(url, current, 0, utc_now(), error="too_many_redirects", redirects=chain)

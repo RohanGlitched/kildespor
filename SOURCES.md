@@ -28,7 +28,7 @@ no paid API, no search-engine scraping, no social-platform scraping. Third-party
   answered with backoff (Retry-After honoured).
 - Only `http`/`https`; hosts resolving to private, loopback, link-local or reserved addresses are
   refused; at most 5 redirects; bodies capped at 3 MB; 10 s read and 5 s connect timeouts, 60 s per candidate site.
-- Raw responses are stored gzip-compressed by SHA-256 in `snapshots/` next to the output, so every
+- Raw responses are stored in `snapshots.zip` next to the output, one entry per SHA-256, so every
   evidence hash can be checked against the bytes we saw.
 
 ## Not used, on purpose
