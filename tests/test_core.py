@@ -133,8 +133,8 @@ def test_exact_legal_name_proof_keeps_norwegian_letters():
     res = SiteResult(Candidate("raservice.no", "name_derived"), "ambiguous", "", home=page("RA Service AS er et firma", url="https://www.raservice.no/", title="RA Service AS"))
     res.pages = [res.home]
     assert verify(res, ent, [], "933126919").status == "ambiguous"
-    ent2 = {"navn": "FJELLFORM AS", "forretningsadresse": {}}
-    res2 = SiteResult(Candidate("fjellform.no", "name_derived"), "ambiguous", "", home=page("Velkommen", url="https://www.fjellform.no/", title="Fjellform AS"))
+    ent2 = {"navn": "FJELLFORM AS", "forretningsadresse": {"poststed": "GEILO", "kommune": "HOL", "postnummer": "3580"}}
+    res2 = SiteResult(Candidate("fjellform.no", "name_derived"), "ambiguous", "", home=page("Velkommen til oss på Geilo", url="https://www.fjellform.no/", title="Fjellform AS"))
     res2.home.site_name = "Fjellform AS"
     res2.pages = [res2.home]
     out = verify(res2, ent2, [], "933355950")
@@ -185,3 +185,38 @@ def test_housing_coop_needs_exact_name_and_town():
                        home=page("Brekkene Borettslag i Haugesund", url="https://brekkene-borettslag.no/"))
     wrong.pages = [wrong.home]
     assert verify(wrong, ent, [], "999999999").status == "ambiguous"
+
+
+def test_legal_form_is_case_sensitive_and_needs_the_town():
+    ent = {"navn": "NEMITEK AS", "forretningsadresse": {"poststed": "OSLO", "kommune": "OSLO", "postnummer": "0150"}}
+    res = SiteResult(Candidate("nemitek.com", "name_derived"), "ambiguous", "",
+                     home=page("Upload your game save to Nemitek as part of the beta. Oslo", url="https://nemitek.com/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "915903037").status == "ambiguous"
+
+
+def test_copyright_line_naming_another_company_rejects_the_site():
+    ent = {"navn": "SUNNSAND AS", "forretningsadresse": {"adresse": ["Industrivegen 3"], "postnummer": "5412", "poststed": "STORD"}}
+    res = SiteResult(Candidate("sunnsand.no", "name_derived"), "ambiguous", "",
+                     home=page("Sunnsand\nIndustrivegen 3, 5412 Stord\n© 2026 Sunnhordland Sandblåsing AS", url="https://sunnsand.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "998680360").status == "other_entity"
+
+
+def test_registry_website_alone_is_not_proof():
+    ent = {"navn": "SAMEIET GJERDETUNET 1-11", "forretningsadresse": {}}
+    res = SiteResult(Candidate("bate.no", "registry_website", "www.bate.no"), "ambiguous", "",
+                     home=page("Bate boligbyggelag – Min side", url="https://www.bate.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "912302792").status == "ambiguous"
+
+
+def test_phone_parsing_rejects_foreign_years_and_country_code_prefix():
+    p = page("Tlf: +971 5430 8123\nTelefon 2022 2021\nTelefon: +47 22 13 28 80", links=[("tel:+35810709000", "")])
+    got = {d for d, _ in sp.phones(p)}
+    assert got == {"22132880"}
+
+
+def test_facebook_p_links_keep_their_slug():
+    p = page("", links=[("https://www.facebook.com/p/Fidi-Video-100063/", ""), ("https://www.facebook.com/policies/", "")])
+    assert [x[2] for x in sp.socials(p)] == ["p/Fidi-Video-100063"]

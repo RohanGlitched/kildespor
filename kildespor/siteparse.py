@@ -4,12 +4,13 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 
 from selectolax.parser import HTMLParser
 
 ORGNR_RE = re.compile(r"(?<![\d])(\d{3})[\s .\-]?(\d{3})[\s .\-]?(\d{3})(?![\d])")
-ORGNR_LABEL_RE = re.compile(r"(org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|foretaksregisteret|mva|vat)", re.I)
+ORGNR_LABEL_RE = re.compile(r"(org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|organi[sz]ation\s*(?:number|no\.?|nr)|company\s*(?:reg(?:istration)?\.?\s*)?(?:number|no\.?)|business\s*(?:id|number)|foretaksregisteret|enhetsregisteret|mva|vat)", re.I)
+OPERATOR_RE = re.compile(r"(?:©|\(c\)|copyright|drevet av|driftet av|behandlingsansvarlig(?:\s+er)?|data\s*controller(?:\s+is)?|ansvarlig for (?:nettstedet|siden))[^\n]{0,60}?((?:[A-ZÆØÅ][\wæøåÆØÅ&.\-]*\s+){0,5}(?:AS|ASA|ANS|DA|SA|BA|NUF))(?![\wæøå])")
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?<![\d])(?:\+47[\s ]?|0047[\s ]?)?(\d{2}[\s ]?\d{2}[\s ]?\d{2}[\s ]?\d{2}|\d{3}[\s ]?\d{2}[\s ]?\d{3})(?![\d])")
 POSTCODE_RE = re.compile(r"(?<![\d])(\d{4})[ \t ]+([A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+(?:[ \t ][A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+)?)")
@@ -166,7 +167,7 @@ def emails(page: Page) -> list[str]:
     found = []
     for href, _ in page.links:
         if href.lower().startswith("mailto:"):
-            e = href[7:].split("?")[0].strip().lower()
+            e = unquote(href[7:].split("?")[0]).strip().lower()
             if EMAIL_RE.fullmatch(e):
                 found.append(e)
     for e in EMAIL_RE.findall(page.text):
@@ -181,21 +182,44 @@ def emails(page: Page) -> list[str]:
     return out
 
 
+YEAR_PAIR = re.compile(r"^(19|20)\d\d(19|20)\d\d$")
+
+
+def _norwegian(raw: str) -> str:
+    """8-digit Norwegian number from a tel: value or printed number, or "" when it is foreign or malformed."""
+    raw = raw.strip()
+    d = re.sub(r"\D", "", raw)
+    if raw.startswith("+") or raw.startswith("00"):
+        if d.startswith("0047"):
+            d = d[4:]
+        elif d.startswith("47"):
+            d = d[2:]
+        else:
+            return ""  # another country's number
+    elif len(d) == 10 and d.startswith("47"):
+        d = d[2:]
+    if len(d) != 8 or d[0] not in "2345679" or YEAR_PAIR.match(d):
+        return ""
+    return d
+
+
 def phones(page: Page) -> list[tuple[str, str]]:
-    """(8-digit number, span)"""
+    """(8-digit Norwegian number, span). Foreign numbers, year pairs and numbers glued to more digits are skipped."""
     out: dict[str, str] = {}
     for href, text in page.links:
         if href.lower().startswith("tel:"):
-            d = re.sub(r"\D", "", href[4:])
-            if d.startswith("47") and len(d) == 10:
-                d = d[2:]
-            elif d.startswith("0047"):
-                d = d[4:]
-            if len(d) == 8 and d[0] in "2345679":
+            d = _norwegian(unquote(href[4:]))
+            if d:
                 out.setdefault(d, f"tel:{href[4:]} {text}")
     for m in PHONE_RE.finditer(page.text):
+        before = page.text[max(0, m.start() - 6): m.start()]
+        after = page.text[m.end(): m.end() + 3]
+        if re.search(r"\+\s?\d{1,3}[\s\u00a0]?$", before) and not re.search(r"\+\s?47[\s\u00a0]?$", before):
+            continue  # follows a foreign country code
+        if re.match(r"[\s\u00a0]?\d", after):
+            continue  # part of a longer number
         d = re.sub(r"\D", "", m.group(1))
-        if len(d) == 8 and d[0] in "2345679":
+        if len(d) == 8 and d[0] in "2345679" and not YEAR_PAIR.match(d):
             ctx = page.text[max(0, m.start() - 40): m.end() + 10].replace("\n", " ")
             if re.search(r"tlf|telefon|phone|tel\.?|mobil|ring|sentralbord|\+47", ctx, re.I):
                 out.setdefault(d, ctx)
@@ -223,8 +247,13 @@ def socials(page: Page) -> list[tuple[str, str, str]]:
                     if "id=" not in q:
                         break
                     handle = "profile.php?" + q
+                elif handle.lower().startswith(("p/", "pg/")) and handle.count("/") >= 1:
+                    handle = handle.split("/")[1] if handle.lower().startswith("pg/") else "p/" + handle.split("/")[1]
                 elif "/" in handle and not handle.lower().startswith(("pages/", "people/")):
                     handle = handle.split("/")[0]
+                if handle.lower() in ("p", "pg", "policies", "business", "privacy", "legal", "terms", "ads", "help", "pages",
+                                      "people", "watch", "groups", "events", "marketplace", "gaming", "login", "home.php"):
+                    break
                 url = f"https://www.facebook.com/{handle}"
             else:
                 handle = m.group(1)
@@ -232,8 +261,12 @@ def socials(page: Page) -> list[tuple[str, str, str]]:
                         "pinterest": "https://www.pinterest.com/", "vimeo": "https://vimeo.com/",
                         "snapchat": "https://www.snapchat.com/add/", "threads": "https://www.threads.net/@"}[platform]
                 url = base + handle
-            if handle.lower() in ("", "share", "sharer", "home", "intent", "wix", "squarespace", "wordpress", "shopify", "facebook",
-                                  "instagram", "youtube", "linkedin", "tiktok", "twitter", "x"):
+            hl = handle.lower().split("/")[-1]
+            if hl in ("", "share", "sharer", "home", "intent", "wix", "wix-com", "wixcom", "squarespace", "wordpress", "wordpressdotcom",
+                      "shopify", "facebook", "meta", "instagram", "youtube", "linkedin", "tiktok", "twitter", "x", "privacy", "policies",
+                      "business", "terms", "legal", "help", "about", "explore", "watch", "jobs", "feed", "hashtag", "search", "i",
+                      "webflow", "godaddy", "one-com", "onecom", "domeneshop", "squarespace-inc", "hubspot", "mailchimp",
+                      "elementor", "divi", "elegantthemes", "themeforest", "envato", "vimeo", "staff", "channel", "user", "c"):
                 break
             out.setdefault((platform, url.lower()), (platform, url, handle))
             break

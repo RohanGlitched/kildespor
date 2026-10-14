@@ -79,24 +79,39 @@ def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     out = {"socials": [], "feeds": [], "job_links": [], "news_pages": []}
     site_reg = registrable(res.home.host())
     reg_phones = {norm_phone(x) for x in (ent.get("telefon"), ent.get("mobil")) if x}
-    seen_social: set[str] = set()
+    # company-owned profiles: when a site links several profiles on one platform (client portfolios, partners,
+    # template leftovers), keep only those whose handle resembles the company's name, domain or brand
+    found: dict[str, dict[str, tuple]] = {}
     for page in res.pages:
         for platform, url, handle in sp.socials(page):
-            key = url.lower().rstrip("/")
-            if key in seen_social:
-                continue
-            seen_social.add(key)
+            found.setdefault(platform, {}).setdefault(url.lower().rstrip("/"), (platform, url, handle, page))
+    hints = _identity_hints(ent, res)
+    for platform, items in found.items():
+        keep = list(items.items())
+        if len(keep) > 1:
+            keep = [(k, v) for k, v in keep if _resembles(v[2], hints)]
+        for key, (platform, url, handle, page) in keep[:2]:
             out["socials"].append((platform, url, handle))
             p.add(Claim("social", "company_profile", {"platform": platform, "url": url, "handle": handle},
                         [_ev(page, f"link to {url} on {page.final_url}", "outbound_link")],
                         label=f"{platform.title() if platform != 'x' else 'X'} profile", confidence=0.95,
                         key=f"social:company_profile:{key}"))
+    phones_kept = 0
+    for page in res.pages:
+        kind = _page_kind(page, res)
         for e in sp.emails(page)[:6]:
             dom = e.split("@")[-1]
-            if registrable(dom) == site_reg or e == (ent.get("epostadresse") or "").lower():
+            if (registrable(dom) == site_reg or e == (ent.get("epostadresse") or "").lower()) and sp.EMAIL_RE.fullmatch(e):
                 p.add(Claim("contact", "email", e, [_ev(page, e, "page_text_or_mailto")], label="E-mail on the company site",
                             confidence=0.97, key=f"contact:email:{e}"))
-        for d, span in sp.phones(page)[:4]:
+        if kind not in ("home", "contact", "about"):
+            continue  # privacy pages quote regulators, store lists quote retailers, investor pages quote analysts
+        nums = sp.phones(page)
+        crowded = len(nums) > 4
+        for d, span in nums:
+            if phones_kept >= 3 or (crowded and d not in reg_phones):
+                continue
+            phones_kept += 1
             p.add(Claim("contact", "phone", d, [_ev(page, span, "page_text_or_tel")], label="Phone on the company site",
                         confidence=0.97 if d in reg_phones else 0.9, key=f"contact:phone:{d}"))
         for node in page.jsonld:
@@ -118,6 +133,32 @@ def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     _description(p, res)
     _careers(p, res, out)
     return out
+
+
+def _identity_hints(ent: dict, res: SiteResult) -> set[str]:
+    hints = {t for t in name_tokens(ent.get("navn", "")) if len(t) >= 3}
+    label = fold(res.home.host().removeprefix("www.").split(".")[0]).replace("-", "")
+    if len(label) >= 3:
+        hints.add(label)
+    for x in (res.home.site_name, res.home.title.split("|")[0].split(" - ")[0]):
+        hints |= {t for t in name_tokens(x or "") if len(t) >= 4}
+    return hints
+
+
+def _resembles(handle: str, hints: set[str]) -> bool:
+    h = re.sub(r"[^a-z0-9]", "", fold(handle.split("?")[0].split("/")[-1]))
+    return bool(h) and any(x in h or (len(h) >= 4 and h in x) for x in hints)
+
+
+def _page_kind(page: sp.Page, res: SiteResult) -> str:
+    if page is res.home or page.final_url.rstrip("/") == res.home.final_url.rstrip("/"):
+        return "home"
+    u = page.final_url.lower()
+    if re.search(r"kontakt|contact|finn-oss|find-us", u):
+        return "contact"
+    if re.search(r"om-oss|about|om-firma|om-selskapet", u):
+        return "about"
+    return "other"
 
 
 def _jsonld_org(p: Profile, page: sp.Page, node: dict, out: dict) -> None:

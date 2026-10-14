@@ -135,8 +135,10 @@ def _exact_name_rx(name: str) -> re.Pattern | None:
     core = " ".join(parts[:-1])
     if len(core.replace(" ", "")) < 4:
         return None
-    pat = r"(?<![\wæøåÆØÅ])" + r"\s+".join(re.escape(x) for x in parts) + r"(?![\wæøåÆØÅ])"
-    return re.compile(pat, re.I)
+    # the name is case-insensitive, the legal form is not: "Nemitek as part of" must not read as "NEMITEK AS"
+    pat = (r"(?<![\wæøåÆØÅ])" + r"\s+".join("(?i:" + re.escape(x) + ")" for x in parts[:-1]) + r"\s+" +
+           re.escape(parts[-1].upper()) + r"(?![\wæøåÆØÅ])")
+    return re.compile(pat)
 
 
 def _domain_from_name(domain: str, toks: list[str]) -> bool:
@@ -197,8 +199,13 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
     if not res.proofs and not others:
         legal = _exact_name_rx(ent.get("navn", ""))
         label_ok = res.candidate.declared or _domain_from_name(res.domain, toks)
+        place_words = {fold(x) for x in (addr.get("poststed"), addr.get("kommune")) if x}
         if legal and label_ok:
-            for page in res.pages:
+            all_text = fold(" ".join(f"{p.title} {p.text}" for p in res.pages))
+            words_all = set(re.findall(r"[a-z0-9]+", all_text))
+            place_ok = any(re.search(rf"(?<!\d){pc}(?!\d)", all_text) for pc in postcodes) or \
+                any(all(w in words_all for w in t.split()) for t in place_words)
+            for page in (res.pages if place_ok else []):
                 for hay in (page.site_name, page.title, page.text):
                     m = legal.search(hay or "")
                     if m:
@@ -239,6 +246,14 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
                     res.proofs.append(Proof("role_holder_and_name", f"{', '.join(hits[:2])} (role register) and {ent.get('navn')} on the page",
                                             page.final_url, page.sha256, page.retrieved_at, 0.9 if len(hits) >= 2 else 0.88))
                     break
+    if not ours_seen:
+        own = fold(ent.get("navn", ""))
+        for page in res.pages:
+            for m in sp.OPERATOR_RE.finditer(f"{page.title}\n{page.text}"):
+                named = fold(m.group(1)).strip()
+                if named and named != own and not own.startswith(named) and not named.startswith(own.rsplit(" ", 1)[0] + " "):
+                    others.setdefault("operator:" + m.group(1).strip(), m.group(0)[:120])
+                    break
     res.other_orgnrs = sorted(others)
     if others and not ours_seen:
         # the site names a different legal entity as its operator
@@ -249,23 +264,8 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
         res.status = "exact"
         res.reason = "; ".join(sorted({p.kind for p in res.proofs}))
         return res
-    if res.candidate.origin in ("registry_website", "wikidata_website"):
-        name_seen = any(_tokens_present(toks, f"{p.title} {p.site_name} {p.text[:20000]}") for p in res.pages)
-        same_host = registrable(res.home.host()) == registrable(res.candidate.domain) if res.home else False
-        if same_host or name_seen:
-            res.proofs.append(Proof("registry_declared", f"hjemmeside: {res.candidate.detail}", res.home.final_url,
-                                    res.home.sha256, res.home.retrieved_at, 0.9 if name_seen else 0.85))
-            res.status = "exact"
-            res.reason = "declared in the register" + (" and the legal name appears on the site" if name_seen else "")
-            return res
-    if res.candidate.origin in ("registry_email", "subunit_website", "subunit_email", "job_ad_homepage"):
-        name_seen = any(_tokens_present(toks, f"{p.title} {p.site_name} {p.text[:20000]}") for p in res.pages)
-        if name_seen and registrable(res.home.host()) == registrable(res.candidate.domain):
-            res.proofs.append(Proof("registry_declared", f"registered e-mail domain {res.candidate.detail}; legal name on site",
-                                    res.home.final_url, res.home.sha256, res.home.retrieved_at, 0.9))
-            res.status = "exact"
-            res.reason = "register e-mail domain and legal name on the site"
-            return res
+    # A website or e-mail domain declared in the register is not proof on its own: managers, parents, chains and
+    # sister companies are often declared (audit: 2 of 12 such sites were the entity's own). It stays a registry fact.
     res.status = "ambiguous"
     res.reason = res.reason or "no organisation number, registered phone, e-mail or address on the site"
     return res

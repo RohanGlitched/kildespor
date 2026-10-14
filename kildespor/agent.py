@@ -80,7 +80,9 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})
             same_site = res.home and any(res.home.sha256 == x.home.sha256 or res.home.title == x.home.title for x in exact)
-            if res.status == "exact" and res.domain not in seen_domains and not same_site and len(exact) < MAX_EXACT_SITES:
+            # a second website is published only when it, too, shows the organisation number
+            second_ok = not exact or any(pr.kind == "orgnr" for pr in res.proofs)
+            if res.status == "exact" and res.domain not in seen_domains and not same_site and second_ok and len(exact) < MAX_EXACT_SITES:
                 seen_domains.add(res.domain)
                 exact.append(res)
         if exact and group is declared:
