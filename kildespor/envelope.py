@@ -31,6 +31,14 @@ def _fmt_nok(v: float | int | None) -> str:
     return f"{sign}NOK {v:.0f}"
 
 
+def _clip_words(text: str, limit: int) -> str:
+    text = " ".join(str(text).split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(",;:-–")
+    return cut + "…"
+
+
 def _first(claims: list[Claim], field: str) -> Claim | None:
     return next((c for c in claims if c.field == field), None)
 
@@ -61,9 +69,9 @@ def summarise(p: Profile) -> dict[str, Any]:
     desc = _first(by["description"], "site_description") or _first(by["description"], "about_page")
     purpose = _first(by["description"], "registered_purpose")
     if desc:
-        s.append({"topic": "what_it_does", "text": f"Its website says: “{desc.value[:220]}”", "claim_keys": [desc.key]})
+        s.append({"topic": "what_it_does", "text": f"Its website says: “{_clip_words(desc.value, 220)}”", "claim_keys": [desc.key]})
     elif purpose:
-        s.append({"topic": "what_it_does", "text": f"Registered purpose: {purpose.value[:220]}", "claim_keys": [purpose.key]})
+        s.append({"topic": "what_it_does", "text": f"Registered purpose: {_clip_words(purpose.value, 220)}", "claim_keys": [purpose.key]})
     fin = [c for c in by["financials"] if isinstance(c.value, dict) and "amount" in c.value]
     years = sorted({c.value["year"] for c in fin})
     if years:
