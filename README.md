@@ -29,6 +29,51 @@ Running the same command again with the same output directory is a **refresh**: 
 matched to the previous run by a stable key, changes are reported with evidence for both sides,
 and facts whose source failed this time are kept, marked as carried forward.
 
+## Results
+
+**Live viewer of the 100-company smoke test: https://rohanglitched.github.io/kildespor/**
+(search, filter, compare, open the source behind every fact; works on phones).
+
+The smoke test is the public universe sampled with Builderr's own `select_entry_batch.py` at its default
+seed, so anyone can reproduce the batch. Everything it produced is in [`smoke/run/`](smoke/run):
+envelopes, run report, the evidence archive and the `verify` report.
+
+| | Smoke test (100) | Development run (1,000) |
+|---|---:|---:|
+| Envelopes / validation | 100 / passed | 1000 / passed |
+| Facts | 6,581 | 63,909 |
+| Evidence records, hash found in archive | 6,543, all | 63,532 |
+| Runtime from a cold start | 5.5 min | 8.2 min ¹ |
+| Third-party cost | $0 | $0 |
+
+¹ On that run NAV's feed could not be reached because of a local DNS fault (since fixed by the resolver fallback); the job index builds in parallel with the research, so it adds little when it runs.
+
+Companies with at least one verified fact, by field family:
+
+| Family | Smoke test | 1,000 run |
+|---|---:|---:|
+| Legal identity and brand | 100 / 100 | 1000 / 1,000 |
+| Annual accounts and history | 100 / 100 | 999 / 1,000 |
+| Leadership and board | 100 / 100 | 999 / 1,000 |
+| Workplaces and addresses | 100 / 100 | 1000 / 1,000 |
+| Verified official website | 9 / 100 | 139 / 1,000 |
+| Company-published contact details | 36 / 100 | 437 / 1,000 |
+| Company-owned profiles | 2 / 100 | 85 / 1,000 |
+| Hiring | 1 / 100 | 21 / 1,000 |
+| Dated public activity | 100 / 100 | 1000 / 1,000 |
+| Customer ratings | 0 / 100 | 21 / 1,000 |
+| What the company does | 100 / 100 | 1000 / 1,000 |
+
+A random company from the register is usually a small holding or property company with no website,
+so the share with a website or profiles reflects the population, not a crawl limit. On the
+1,000-company run, websites verified by Kildespor reach **139** companies; the register lists a website for
+about 9% of them.
+
+**Precision.** Independent audits of the 1,000-company run re-fetched every website not proven
+by its organisation number: wrong-company websites went from 16 to 10 to 3, and every site proven by
+its own organisation number was correct in every audit. What each audit found and the rule it
+produced: [EVAL.md](EVAL.md).
+
 ## Check the evidence yourself
 
 ```bash
