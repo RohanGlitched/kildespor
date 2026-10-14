@@ -22,6 +22,7 @@ FAMILIES = {
     "social": "Company-owned profiles",
     "jobs": "Hiring",
     "activity": "Dated public activity",
+    "reviews": "Customer ratings",
     "description": "What the company says it does",
 }
 

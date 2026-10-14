@@ -17,6 +17,7 @@ no paid API, no search-engine scraping, no social-platform scraping. Third-party
 | TED (EU Publications Office) | public-contract award notices won | `api.ted.europa.eu/v3/notices/search`, one query per 100 companies | EU open data | winner identifier = organisation number |
 | Finanstilsynet | supervision record, LEI, licences | `api.finanstilsynet.no/registry/v2/…` | public API | register's organisation number must equal ours |
 | Arbeidstilsynet | approval in the cleaning and occupational-health registers | one XML per register per run, `registerdata.arbeidstilsynet.no` | public data | organisation number |
+| Fagfolkguiden | the Google aggregate rating a tradesperson-directory page displays (no review text) | `www.fagfolkguiden.no/bedrift/{slug}-{orgnr}`; robots.txt allows `/bedrift/` | public page | JSON-LD `identifier` = organisation number |
 | DNS | which name-derived domains exist | public resolvers via dnspython | n/a | candidate generation only, never evidence |
 
 ## Crawler behaviour

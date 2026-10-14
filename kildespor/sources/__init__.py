@@ -35,6 +35,8 @@ def default_sources(args: argparse.Namespace) -> list[Source]:
     out.append(Finanstilsynet())
     from .arbeidstilsynet import Arbeidstilsynet
     out.append(Arbeidstilsynet())
+    from .fagfolkguiden import Fagfolkguiden
+    out.append(Fagfolkguiden())
     if not getattr(args, "no_jobs", False):
         from .nav_jobs import NavJobs
         out.append(NavJobs())

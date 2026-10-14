@@ -97,6 +97,7 @@
     if ("amount" in v) return money(v.amount, v.currency) + (v.shares ? ' <span class="lb">' + nf.format(v.shares) + " shares</span>" : "");
     if (v.id && v.url && v.label) return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.label) + "</a> " + '<span class="lb">' + esc(v.id) + "</span>";
     if (v.url && (v.platform || v.domain)) return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.domain || v.url.replace(/^https?:\/\/(www\.)?/, "")) + "</a>" + (v.identity_proof ? '<span class="tag">proof: ' + esc(v.identity_proof.join(", ")) + "</span>" : "");
+    if (v.rating != null && v.count != null) return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.rating) + " / " + esc(v.best || 5) + "</a> " + '<span class="lb">' + esc(v.count) + " ratings · " + esc(v.platform || "") + "</span>";
     if (v.year && v.format === "pdf") return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">Annual accounts ' + esc(v.year) + " (PDF)</a>";
     if (v.title) return (v.url ? '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.title) + "</a>" : esc(v.title)) +
       (v.status ? '<span class="tag ' + (v.status === "closed" ? "closed" : "") + '">' + esc(v.status) + "</span>" : "") +
@@ -206,7 +207,7 @@
       '<div class="grid">' +
       famSection(env, "identity", "Legal identity and brand") + finSection(env) + famSection(env, "people", "Leadership and board") +
       famSection(env, "locations", "Workplaces and addresses") + famSection(env, "website", "Verified website") + famSection(env, "social", "Company-owned profiles") +
-      famSection(env, "contact", "Contact details") + famSection(env, "jobs", "Hiring") + timeline(env) + famSection(env, "description", "What it does") + changesSection(env) +
+      famSection(env, "contact", "Contact details") + famSection(env, "jobs", "Hiring") + famSection(env, "reviews", "Customer ratings") + timeline(env) + famSection(env, "description", "What it does") + changesSection(env) +
       "</div>" + foot();
     $("#main").innerHTML = html;
     document.title = (env.legal_name || env.organisation_number) + " · Kildespor";

@@ -25,7 +25,7 @@ from .util import sha256_bytes, utc_now
 USER_AGENT = "KildesporBot/1.0 (+https://github.com/RohanGlitched/kildespor; company research for the Builderr Signalpost challenge)"
 MAX_BODY = 3_000_000
 # public APIs that are built for parallel clients; every other host gets one request at a time
-HOST_LIMITS = {"data.brreg.no": 8, "stottetiltak-registerinfo-api.app.brreg.no": 4, "api.ted.europa.eu": 2, "api.finanstilsynet.no": 6, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
+HOST_LIMITS = {"data.brreg.no": 8, "stottetiltak-registerinfo-api.app.brreg.no": 4, "api.ted.europa.eu": 2, "api.finanstilsynet.no": 6, "www.fagfolkguiden.no": 3, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
                "www.youtube.com": 4, "news.google.com": 2}
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 

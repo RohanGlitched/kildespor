@@ -10,7 +10,7 @@ SECTIONS = [
     ("annual_accounts", "Latest annual accounts and available history", ["financials"]),
     ("leadership_and_workplaces", "Leadership and registered workplaces", ["people", "locations"]),
     ("website_and_profiles", "Verified official website and company-owned profiles", ["website", "social", "contact"]),
-    ("hiring_and_activity", "Hiring and dated public activity", ["jobs", "activity"]),
+    ("hiring_and_activity", "Hiring, ratings and dated public activity", ["jobs", "activity", "reviews"]),
 ]
 
 ROLE_ORDER = ["DAGL", "LEDE", "NEST", "MEDL", "VARA", "KONT", "REVI", "REGN", "INNH", "DTPR", "DTSO", "KOMP", "BEST", "SAM"]
@@ -124,6 +124,11 @@ def summarise(p: Profile) -> dict[str, Any]:
     elif any(c.field in ("careers_page", "recruitment_channel") for c in by["jobs"]):
         c = next(c for c in by["jobs"] if c.field in ("careers_page", "recruitment_channel"))
         s.append({"topic": "hiring", "text": "It publishes a careers page, but no individual open postings were found.", "claim_keys": [c.key]})
+    rating = _first(by["reviews"], "customer_rating")
+    if rating:
+        v = rating.value
+        s.append({"topic": "reviews", "text": f"Customer rating {v['rating']}/{v.get('best', 5)} from {v['count']} ratings ({v['platform']}).",
+                  "claim_keys": [rating.key]})
     acts = sorted([c for c in by["activity"] if c.effective_date], key=lambda c: c.effective_date, reverse=True)
     if acts:
         top = acts[0]
