@@ -9,7 +9,7 @@ from . import extract, registry
 from .claims import FAMILIES, Profile
 from .discovery import Candidate, Resolver, candidates, domain_of, registrable
 from .http import Client
-from .site import SiteResult, crawl, verify
+from .site import SiteResult, complete, crawl, verify
 
 MAX_NAME_CANDIDATES = 5
 MAX_EXACT_SITES = 2
@@ -43,6 +43,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         return p, trace
     p.notes["entity"] = ent
     await registry.add_registry(ctx.client, p, ent, f)
+    trace["t_entity_ms"] = int((time.monotonic() - t0) * 1000)
     _, subunits, years = await asyncio.gather(
         registry.add_roles(ctx.client, p, orgnr),
         registry.add_subunits(ctx.client, p, orgnr),
@@ -52,6 +53,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     p.notes["financial_years"] = years
 
     # --- website discovery and verification -------------------------------------------
+    trace["t_registry_ms"] = int((time.monotonic() - t0) * 1000)
     cands = candidates(ent, subunits)
     have = {c.domain for c in cands}
     for src in ctx.sources:
@@ -62,6 +64,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
                 have.add(d)
     exists = await asyncio.gather(*(ctx.resolver.exists(c.domain) for c in cands))
     live = [c for c, ok in zip(cands, exists) if ok]
+    trace["t_dns_ms"] = int((time.monotonic() - t0) * 1000)
     trace["candidates"] = [{"domain": c.domain, "origin": c.origin, "dns": ok} for c, ok in zip(cands, exists)]
     declared = [c for c in live if c.declared]
     guessed = [c for c in live if not c.declared][:MAX_NAME_CANDIDATES]
@@ -82,6 +85,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
                 exact.append(res)
         if exact and group is declared:
             break
+    await asyncio.gather(*(complete(ctx.client, r) for r in exact))
     for res in sorted(exact, key=lambda r: -r.score):
         extract.add_website(p, res)
         found = extract.add_site_claims(p, res, ent)
@@ -102,6 +106,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     for fam in ("social", "contact"):
         p.checked_source(fam, "verified company website" if exact else "no verified website")
 
+    trace["t_website_ms"] = int((time.monotonic() - t0) * 1000)
     # --- run-wide connectors ------------------------------------------------------------
     for src in ctx.sources:
         try:
@@ -124,6 +129,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})
             if res.status == "exact" and not exact:
+                await complete(ctx.client, res)
                 exact.append(res)
                 p.states.pop("website", None)
                 extract.add_website(p, res)

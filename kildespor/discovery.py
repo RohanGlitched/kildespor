@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import socket
 import re
 from dataclasses import dataclass
 
@@ -156,28 +157,71 @@ def candidates(ent: dict, subunits: list[dict]) -> list[Candidate]:
     return list(found.values())
 
 
+PUBLIC_DNS = ["1.1.1.1", "8.8.8.8", "9.9.9.9"]
+
+
 class Resolver:
+    """DNS existence checks. Configured nameservers that do not answer are dropped at start-up
+    (stale adapters are common) and public resolvers are kept as a fallback; if dnspython cannot
+    answer at all, the operating system's resolver is used."""
+
     def __init__(self, concurrency: int = 64) -> None:
         self.r = dns.asyncresolver.Resolver()
-        self.r.lifetime = 4.0
-        self.r.timeout = 2.0
+        self.r.lifetime = 3.0
+        self.r.timeout = 1.5
         self.sem = asyncio.Semaphore(concurrency)
         self.cache: dict[str, bool] = {}
+        self.ready = False
+        self.lock = asyncio.Lock()
+        self.system_fallback = False
+
+    async def _init(self) -> None:
+        async with self.lock:
+            if self.ready:
+                return
+            good = []
+            for ns in list(dict.fromkeys(list(self.r.nameservers) + PUBLIC_DNS)):
+                probe = dns.asyncresolver.Resolver(configure=False)
+                probe.nameservers = [ns]
+                try:
+                    await probe.resolve("brreg.no", "A", lifetime=2.0)
+                    good.append(ns)
+                except dns.exception.DNSException:
+                    continue
+            if good:
+                self.r.nameservers = good
+            else:
+                self.system_fallback = True
+            self.ready = True
 
     async def exists(self, domain: str) -> bool:
+        if not self.ready:
+            await self._init()
         if domain in self.cache:
             return self.cache[domain]
         ok = False
         async with self.sem:
-            for host, rtype in itertools.product((domain, "www." + domain), ("A", "AAAA")):
-                try:
-                    await self.r.resolve(host, rtype)
-                    ok = True
-                    break
-                except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers,
-                        dns.exception.Timeout, dns.name.LabelTooLong, dns.name.EmptyLabel, ValueError):
-                    continue
-                except dns.exception.DNSException:
-                    continue
+            if self.system_fallback:
+                for host in (domain, "www." + domain):
+                    try:
+                        await asyncio.wait_for(asyncio.to_thread(socket.getaddrinfo, host, 443), 4)
+                        ok = True
+                        break
+                    except (OSError, asyncio.TimeoutError):
+                        continue
+            else:
+                for host, rtype in itertools.product((domain, "www." + domain), ("A", "AAAA")):
+                    try:
+                        await self.r.resolve(host, rtype)
+                        ok = True
+                        break
+                    except dns.resolver.NXDOMAIN:
+                        if rtype == "A":
+                            break  # the name does not exist: no point asking for AAAA
+                    except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.exception.Timeout,
+                            dns.name.LabelTooLong, dns.name.EmptyLabel, ValueError):
+                        continue
+                    except dns.exception.DNSException:
+                        continue
         self.cache[domain] = ok
         return ok

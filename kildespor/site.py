@@ -1,6 +1,7 @@
 """Crawl a candidate website and decide whether it belongs to the exact legal entity."""
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
@@ -33,6 +34,7 @@ class SiteResult:
     proofs: list[Proof] = field(default_factory=list)
     other_orgnrs: list[str] = field(default_factory=list)
     js_shell: bool = False
+    later: list[str] = field(default_factory=list)
 
     @property
     def score(self) -> float:
@@ -59,9 +61,18 @@ async def fetch_page(client: Client, url: str, source: str = "website") -> tuple
     return page, ""
 
 
-async def crawl(client: Client, cand: Candidate) -> SiteResult:
+async def crawl(client: Client, cand: Candidate, budget: float = 60.0) -> SiteResult:
+    """Crawl with a hard time budget; a slow host can never hold up a company's research."""
+    try:
+        return await asyncio.wait_for(_crawl(client, cand), timeout=budget)
+    except asyncio.TimeoutError:
+        return SiteResult(cand, "unreachable", f"site did not answer within {budget:.0f}s")
+
+
+async def _crawl(client: Client, cand: Candidate) -> SiteResult:
     home = None
     why = ""
+    timeouts = 0
     for url in (f"https://{cand.domain}/", f"https://www.{cand.domain}/", f"http://www.{cand.domain}/", f"http://{cand.domain}/"):
         if cand.domain.startswith("www.") and "www.www." in url:
             continue
@@ -70,6 +81,12 @@ async def crawl(client: Client, cand: Candidate) -> SiteResult:
             break
         if why.startswith("blocked:robots"):
             return SiteResult(cand, "blocked", "robots.txt disallows our crawler")
+        if "Timeout" in why:
+            timeouts += 1
+            if timeouts >= 2:
+                break  # a host that times out twice is not going to answer the other variants either
+        elif why.startswith("http:4") or why.startswith("http:5"):
+            break  # the server answered: other variants rarely differ
     if not home:
         return SiteResult(cand, "unreachable", why or "no response")
     res = SiteResult(cand, "ambiguous", "", home=home, pages=[home])
@@ -82,16 +99,29 @@ async def crawl(client: Client, cand: Candidate) -> SiteResult:
         res.reason = f"redirects to {final_reg}"
     res.js_shell = len(home.text.split()) < 60 and len(home.links) < 8
     kinds = sp.internal_links(home, home.host())
-    queue: list[str] = []
+    first: list[str] = []
+    later: list[str] = []
     for kind in ("contact", "about", "privacy", "careers", "news", "people", "locations"):
-        for u, _ in kinds.get(kind, [])[:2 if kind in ("contact", "about") else 1]:
-            if u not in queue and u.rstrip("/") != home.final_url.rstrip("/"):
-                queue.append(u)
-    for u in queue[: MAX_PAGES - 1]:
+        for i, (u, _) in enumerate(kinds.get(kind, [])[:2 if kind in ("contact", "about") else 1]):
+            if u in first or u in later or u.rstrip("/") == home.final_url.rstrip("/"):
+                continue
+            (first if kind in ("contact", "about", "privacy") and i == 0 else later).append(u)
+    # identity pages first; the rest only once the site is proven to be this entity
+    for u in first[:3]:
         page, _ = await fetch_page(client, u)
         if page:
             res.pages.append(page)
+    res.later = (first[3:] + later)[: MAX_PAGES - 1 - len(res.pages) + 1]
     return res
+
+
+async def complete(client: Client, res: SiteResult) -> None:
+    """Fetch the remaining priority pages of a verified site for extraction."""
+    for u in getattr(res, "later", [])[: MAX_PAGES - len(res.pages)]:
+        page, _ = await fetch_page(client, u)
+        if page:
+            res.pages.append(page)
+    res.later = []
 
 
 FORMS = {"AS": "AS", "ASA": "ASA", "ANS": "ANS", "DA": "DA", "SA": "SA", "BA": "BA", "NUF": "NUF", "STI": "", "ENK": ""}

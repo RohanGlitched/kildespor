@@ -29,6 +29,8 @@ def default_sources(args: argparse.Namespace) -> list[Source]:
     out.append(BrregExtra())
     from .smilefjes import Smilefjes
     out.append(Smilefjes())
+    from .ted import Ted
+    out.append(Ted())
     if not getattr(args, "no_jobs", False):
         from .nav_jobs import NavJobs
         out.append(NavJobs())
