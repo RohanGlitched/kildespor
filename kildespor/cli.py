@@ -311,6 +311,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"viewer written to {args.out} ({len(orgs)} companies)")
         return 0
     if args.cmd == "run":
+        from .netfix import install
+        install()
         if sys.platform == "win32":
             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         return asyncio.run(run(args))
