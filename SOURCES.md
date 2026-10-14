@@ -31,6 +31,10 @@ no paid API, no search-engine scraping, no social-platform scraping. Third-party
   (Retry-After honoured), and the account-copies endpoint is paused for three minutes after a 429.
 - Sources that do not feed website discovery run after a company's research slot is released, so the
   slow run-wide index (NAV) never holds up the crawl.
+- DNS: configured nameservers that do not answer are dropped at start-up, public resolvers (1.1.1.1,
+  8.8.8.8, 9.9.9.9) are kept as a fallback, a timeout is never recorded as "domain does not exist", and
+  if the operating system's resolver cannot answer for a host the public resolvers are asked before
+  giving up.
 - Only `http`/`https`; hosts resolving to private, loopback, link-local or reserved addresses are
   refused; at most 5 redirects; bodies capped at 3 MB; 10 s read and 5 s connect timeouts, 60 s per candidate site.
 - Raw responses are stored in `snapshots.zip` next to the output, one entry per SHA-256, so every
