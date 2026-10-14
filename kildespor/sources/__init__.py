@@ -31,6 +31,8 @@ def default_sources(args: argparse.Namespace) -> list[Source]:
     out.append(Smilefjes())
     from .ted import Ted
     out.append(Ted())
+    from .finanstilsynet import Finanstilsynet
+    out.append(Finanstilsynet())
     if not getattr(args, "no_jobs", False):
         from .nav_jobs import NavJobs
         out.append(NavJobs())

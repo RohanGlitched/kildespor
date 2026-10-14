@@ -24,7 +24,7 @@ from .util import sha256_bytes, utc_now
 USER_AGENT = "KildesporBot/1.0 (+https://github.com/RohanGlitched/kildespor; company research for the Builderr Signalpost challenge)"
 MAX_BODY = 3_000_000
 # public APIs that are built for parallel clients; every other host gets one request at a time
-HOST_LIMITS = {"data.brreg.no": 8, "stottetiltak-registerinfo-api.app.brreg.no": 4, "api.ted.europa.eu": 2, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
+HOST_LIMITS = {"data.brreg.no": 8, "stottetiltak-registerinfo-api.app.brreg.no": 4, "api.ted.europa.eu": 2, "api.finanstilsynet.no": 6, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
                "www.youtube.com": 4, "news.google.com": 2}
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
@@ -165,9 +165,15 @@ class Client:
                 except (httpx.HTTPError, OSError, ValueError) as exc:
                     f = Fetched(url, url, 0, utc_now(), error=type(exc).__name__, elapsed_ms=int((time.monotonic() - start) * 1000))
             self.stats.add(source, f)
-            if f.ok or (f.status and f.status < 500):
+            if f.ok or (f.status and f.status < 500 and f.status != 429):
                 break
-            await asyncio.sleep(1.0 * (attempt + 1))
+            wait = 1.0 * (attempt + 1)
+            if f.status == 429:
+                try:
+                    wait = min(60.0, float(resp.headers.get("retry-after") or 10 * (attempt + 1)))
+                except (ValueError, NameError):
+                    wait = 10.0 * (attempt + 1)
+            await asyncio.sleep(wait)
         return f
 
     async def _raw(self, source: str, url: str, *, max_body: int = MAX_BODY, headers: dict | None = None,

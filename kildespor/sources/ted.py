@@ -5,6 +5,7 @@ published only when our exact organisation number is among its winner identifier
 """
 from __future__ import annotations
 
+import asyncio
 import json
 
 from ..claims import Claim, Evidence
@@ -43,7 +44,9 @@ class Ted(Source):
             while page <= 5:
                 body = json.dumps({"query": f"winner-identifier IN ({' '.join(chunk)})", "fields": FIELDS, "limit": 250,
                                    "page": page}).encode()
-                f = await ctx.client.post(self.name, API, body, headers={"Content-Type": "application/json", "Accept": "application/json"})
+                f = await ctx.client.post(self.name, API, body, retries=4,
+                                          headers={"Content-Type": "application/json", "Accept": "application/json"})
+                await asyncio.sleep(1.5)  # TED rate-limits bursts
                 self.queries += 1
                 if not f.ok:
                     raise RuntimeError(f"TED search failed ({f.status or f.error})")
