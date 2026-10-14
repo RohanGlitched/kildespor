@@ -48,9 +48,11 @@ The input may be JSONL (`{"organisation_number": "…"}` per line), a JSON array
    organisation number, the employer homepage in its own NAV ads, and domains derived from the
    legal name that resolve in DNS.
 3. **Prove it.** A site is published only when it shows the organisation number, the registered
-   phone or e-mail, the legal name with the registered street address, or the exact legal name
-   with its legal form on a name-derived domain. A site that prints a different organisation number
-   is rejected. Details: [IDENTITY_RESOLUTION.md](IDENTITY_RESOLUTION.md).
+   phone or e-mail, the legal name with the registered street address, the exact legal name with its
+   legal form and the registered town, or a current role holder together with the full legal name.
+   A site that prints a different organisation number, or whose copyright or data-controller line
+   names another company, is rejected. A website declared in the register is a candidate, never proof
+   on its own. Details: [IDENTITY_RESOLUTION.md](IDENTITY_RESOLUTION.md).
 4. **Read the proven site** for company-owned profiles, contact details, addresses, careers pages,
    recruitment platforms, JobPosting data and dated news (RSS/Atom, JSON-LD, news listings).
 5. **Hiring.** Every active ad in NAV's job feed is indexed by its employer organisation number;
