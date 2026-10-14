@@ -22,7 +22,7 @@ POSTCODE_RE = re.compile(r"(?<![\d])(\d{4})[ \t ]+([A-ZÆØÅ][A-Za-zæøåÆØ
 SOCIAL_PATTERNS = {
     "facebook": re.compile(r"^https?://(?:www\.|m\.|nb-no\.|no-nb\.)?(?:facebook|fb)\.com/(?!sharer|share|dialog|plugins|tr\b|groups/?$|events/?$|pages/?$|watch/?$|login|policy|help|privacy)([A-Za-z0-9.\-_/]+?)/?(?:[?#].*)?$", re.I),
     "instagram": re.compile(r"^https?://(?:www\.)?instagram\.com/(?!p/|explore|accounts|reel/|stories/)([A-Za-z0-9._]+)/?(?:[?#].*)?$", re.I),
-    "linkedin": re.compile(r"^https?://(?:[a-z]{2,3}\.)?linkedin\.com/(company|school|showcase)/([A-Za-z0-9\-_%.]+)/?.*$", re.I),
+    "linkedin": re.compile(r"^https?://(?:[a-z]{2,3}\.)?linkedin\.com/(company|school|showcase)/([A-Za-z0-9\-_%.&+æøåÆØÅ]+)/?(?:[?#].*)?$", re.I),
     "youtube": re.compile(r"^https?://(?:www\.|m\.)?youtube\.com/(channel/[A-Za-z0-9_\-]+|@[A-Za-z0-9._\-]+|c/[A-Za-z0-9._\-]+|user/[A-Za-z0-9._\-]+)/?.*$", re.I),
     "x": re.compile(r"^https?://(?:www\.|mobile\.)?(?:twitter|x)\.com/(?!intent|share|home|search|hashtag|i/)([A-Za-z0-9_]{1,15})/?(?:[?#].*)?$", re.I),
     "tiktok": re.compile(r"^https?://(?:www\.)?tiktok\.com/@([A-Za-z0-9._]+)/?.*$", re.I),

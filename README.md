@@ -70,8 +70,8 @@ so the share with a website or profiles reflects the population, not a crawl lim
 about 9% of them.
 
 **Precision.** Independent audits of the 1,000-company run re-fetched every website not proven
-by its organisation number: wrong-company websites went from 16 to 10 to 3, and every site proven by
-its own organisation number was correct in every audit. What each audit found and the rule it
+by its organisation number: wrong-company websites went from 16 to 10 to 3 to **0 of 70** in the final audit, and every
+site proven by its own organisation number was correct in every audit. What each audit found and the rule it
 produced: [EVAL.md](EVAL.md).
 
 ## Check the evidence yourself

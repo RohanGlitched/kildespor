@@ -29,7 +29,7 @@ Brønnøysund entity, its roles and its registered workplaces.
 | d1000 | 174 | 147 | 3 | 13 | 2 |
 | d1000c | 167 | 102 (all without an org.nr proof) | 1 | 9 | 2 |
 | d1000d | 154 | 83 (all 73 without an org.nr proof + 10) | 0 | 3 (two sister companies sharing an address, one sports club) | 0 |
-| d1000e | after the sibling-stem guard | see below | | | |
+| d1000h | 136 | 70 (all 60 without an org.nr proof + 10) | **0** | **0** | **0** |
 
 In every audit, **every website proven by its own organisation number was correct**. Every bad match
 came from the weaker proofs, and each pattern became a rule and a regression test:
@@ -46,6 +46,12 @@ came from the weaker proofs, and each pattern became a rule and a regression tes
 | Years, fax and foreign numbers read as phones | 20222021, +61 8 6559 6499 | Norwegian numbers only, from home/contact/about pages |
 | A sister company's site at the same address | avineering.com for Avineering Solutions AS (the site is AviNeering AS's) | when the site's brand stem is the exact registered name of another active entity, the site is withheld unless it shows our number |
 | "X er behandlingsansvarlig" | "Sædalen IL er behandlingsansvarlig" | operator lines are read in both word orders |
+| A social handle naming a sister or a foreign maker | facebook.com/milepel for Milepel Campus AS; youtube @AiriusEuropeLtd | a handle that is another active entity's registered name, or names a foreign company form, is dropped |
+| An owner's personal profile, a truncated slug | instagram of the owner of Scope Film AS; facebook.com/novatek.n | handles must share a word with the legal name or the domain; cut-off slugs are dropped |
+
+The final audit (d1000h) also checked every customer rating (21/21 correct: the directory page states the
+organisation number), 15 state-aid awards (15/15) and 10 food inspections (10/10), and all 81 e-mail
+addresses it looked at (81/81).
 
 ## Recall: what the withheld sites were
 

@@ -88,7 +88,9 @@ def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     hints = _identity_hints(ent, res)
     out["hints"] = hints
     for platform, items in found.items():
-        keep = [(k, v) for k, v in items.items() if _resembles(v[2], hints)]
+        host = res.home.host().removeprefix("www.")
+        keep = [(k, v) for k, v in items.items() if _resembles(v[2], hints)
+                and not (len(v[2]) < len(host) and host.startswith(v[2].lower()) and "." in v[2])]
         for key, (platform, url, handle, page) in keep[:2]:
             out["socials"].append((platform, url, handle))
             p.add(Claim("social", "company_profile", {"platform": platform, "url": url, "handle": handle},
@@ -139,13 +141,19 @@ def _identity_hints(ent: dict, res: SiteResult) -> set[str]:
     label = fold(res.home.host().removeprefix("www.").split(".")[0]).replace("-", "")
     if len(label) >= 3:
         hints.add(label)
-    for x in (res.home.site_name, res.home.title.split("|")[0].split(" - ")[0]):
-        hints |= {t for t in name_tokens(x or "") if len(t) >= 4}
     return hints
 
 
+FOREIGN_FORMS = re.compile(r"(?:^|[^a-z])(ltd|limited|gmbh|inc|llc|plc|ab|aps|oy|oyj|bv|srl|sas|sarl|corp)(?:[^a-z]|$)")
+
+
 def _resembles(handle: str, hints: set[str]) -> bool:
-    h = re.sub(r"[^a-z0-9]", "", fold(handle.split("?")[0].split("/")[-1]))
+    last = handle.split("?")[0].rstrip("/").split("/")[-1]
+    if last.endswith("-") or FOREIGN_FORMS.search(re.sub(r"([a-z])([A-Z])", r"\1 \2", last).lower()):
+        return False  # truncated slug, or a handle naming a foreign company
+    h = re.sub(r"[^a-z0-9]", "", fold(last))
+    if any(len(x) > len(h) >= 4 and x.startswith(h) and x != h for x in hints if "." in x or len(x) > 8):
+        pass
     return bool(h) and any(x in h or (len(h) >= 4 and h in x) for x in hints)
 
 

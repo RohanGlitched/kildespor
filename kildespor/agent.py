@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -123,6 +124,9 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         p.checked_source(fam, "verified company website" if exact else "no verified website")
 
     trace["t_website_ms"] = int((time.monotonic() - t0) * 1000)
+    if exact:
+        await prune_sibling_handles(ctx, p, ent, orgnr, subunits)
+        trace["dropped_handles"] = p.notes.get("dropped_handles", [])
     trace["t_website_done_ms"] = int((time.monotonic() - t0) * 1000)
     try:
         await connector_task
@@ -132,6 +136,38 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     p.notes["late_args"] = (ent, subunits, exact, cands, orgnr)
     trace["runtime_ms"] = int((time.monotonic() - t0) * 1000)
     return p, trace
+
+
+async def prune_sibling_handles(ctx: Context, p: Profile, ent: dict, orgnr: str, subunits: list) -> None:
+    """Drop company-site social handles whose name is the registered name of another active entity."""
+    from urllib.parse import quote
+    import json as _json
+    from .util import name_tokens
+    own = {orgnr} | {u.get("organisation_number") for u in subunits}
+    own_core = " ".join(name_tokens(ent.get("navn", "")))
+    for c in list(p.family_claims("social")):
+        if any(e.source_class == "open_knowledge_base" for e in c.evidence):
+            continue  # Wikidata: tied to the organisation number already
+        handle = str(c.value.get("handle", "")).split("?")[0].rstrip("/").split("/")[-1]
+        core = " ".join(name_tokens(re.sub(r"[_.\-]+", " ", re.sub(r"([a-z])([A-Z])", r"\1 \2", handle))))
+        if not core or len(core.replace(" ", "")) < 4 or core == own_core or core.replace(" ", "") == own_core.replace(" ", ""):
+            continue
+        f = await ctx.client.get("brreg", "https://data.brreg.no/enhetsregisteret/api/enheter?size=20&navn=" + quote(core),
+                                 headers={"Accept": "application/json"}, check_robots=False, retries=1)
+        if not f.ok:
+            continue
+        try:
+            rows = (_json.loads(f.body).get("_embedded") or {}).get("enheter") or []
+        except ValueError:
+            continue
+        for r in rows:
+            if r.get("organisasjonsnummer") in own or r.get("slettedato") or r.get("konkurs"):
+                continue
+            if " ".join(name_tokens(r.get("navn", ""))).replace(" ", "") == core.replace(" ", ""):
+                p.claims.remove(c)
+                p._keys.discard(c.key)
+                p.notes.setdefault("dropped_handles", []).append(f"{c.value.get('url')} is the name of {r.get('navn')} ({r.get('organisasjonsnummer')})")
+                break
 
 
 async def _enrich(ctx: Context, src, p: Profile, ent: dict, subunits: list, exact: list) -> None:
