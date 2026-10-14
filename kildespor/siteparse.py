@@ -12,7 +12,7 @@ ORGNR_RE = re.compile(r"(?<![\d])(\d{3})[\s .\-]?(\d{3})[\s .\-]?(\d{3})(?![\d
 ORGNR_LABEL_RE = re.compile(r"(org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|foretaksregisteret|mva|vat)", re.I)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?<![\d])(?:\+47[\s ]?|0047[\s ]?)?(\d{2}[\s ]?\d{2}[\s ]?\d{2}[\s ]?\d{2}|\d{3}[\s ]?\d{2}[\s ]?\d{3})(?![\d])")
-POSTCODE_RE = re.compile(r"(?<![\d])(\d{4})[\s ]+([A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+(?:[\s ][A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+)?)")
+POSTCODE_RE = re.compile(r"(?<![\d])(\d{4})[ \t ]+([A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+(?:[ \t ][A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+)?)")
 
 SOCIAL_PATTERNS = {
     "facebook": re.compile(r"^https?://(?:www\.|m\.|nb-no\.|no-nb\.)?(?:facebook|fb)\.com/(?!sharer|share|dialog|plugins|tr\b|groups/?$|events/?$|pages/?$|watch/?$|login|policy|help|privacy)([A-Za-z0-9.\-_/]+?)/?(?:[?#].*)?$", re.I),

@@ -98,6 +98,27 @@ def _bulk_entity(row: dict) -> dict:
     }
 
 
+def change_sentence(env: dict, ch: dict) -> dict:
+    """What changed since the previous run, in one sourced sentence."""
+    events = env["changes"]
+    if not ch.get("previous_run_id"):
+        return {"topic": "changes", "text": "First run for this company: there is no earlier profile to compare with.", "claim_keys": []}
+    if not events:
+        kept = f" {ch['carried_forward']} fact(s) were kept from the previous run." if ch.get("carried_forward") else ""
+        return {"topic": "changes", "text": f"No changes since the previous run ({(ch.get('previous_completed_at') or '')[:10]}).{kept}",
+                "claim_keys": []}
+    order = {"high": 0, "medium": 1, "low": 2}
+    top = sorted(events, key=lambda e: order.get(e["materiality"], 3))[:3]
+    def word(e: dict) -> str:
+        v = e.get("current") if e.get("current") is not None else e.get("previous")
+        if isinstance(v, dict):
+            v = v.get("title") or v.get("name") or v.get("url") or v.get("domain") or ""
+        return f"{e['type'].replace('_', ' ')}" + (f" ({str(v)[:60]})" if v else "")
+    more = f" and {len(events) - 3} more" if len(events) > 3 else ""
+    return {"topic": "changes", "text": f"Since the previous run: {'; '.join(word(e) for e in top)}{more}.",
+            "claim_keys": [e["key"] for e in top]}
+
+
 def failed_profile(org: str, why: str) -> Profile:
     p = Profile(org)
     p.error("runner", why)
@@ -164,6 +185,7 @@ async def run(args: argparse.Namespace) -> int:
             env["changes"] = ch.pop("events")
             env["refresh"] = ch
             env["sections"]["refresh"].update({"previous_run_id": ch.get("previous_run_id"), "changes": len(env["changes"])})
+            env["summary"]["sentences"].append(change_sentence(env, ch))
             results[org] = env
             done += 1
             if done % 25 == 0 or done == len(orgs):

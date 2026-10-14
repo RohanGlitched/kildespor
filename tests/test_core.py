@@ -146,3 +146,8 @@ def test_exact_legal_name_needs_a_name_derived_domain():
     res = SiteResult(Candidate("fjell.no", "name_derived"), "ambiguous", "", home=page("Kunde: Fjellform AS", url="https://fjell.no/"))
     res.pages = [res.home]
     assert verify(res, ent, [], "933355950").status == "ambiguous"
+
+
+def test_postcode_town_stays_on_one_line():
+    m = sp.POSTCODE_RE.search("Mosseveien 39B, 1610 Fredrikstad\nNorway")
+    assert m and m.group(2) == "Fredrikstad"
