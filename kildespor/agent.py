@@ -60,7 +60,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         for url in getattr(src, "website_candidates", lambda o: [])(orgnr):
             d = domain_of(url)
             if d and d not in have:
-                cands.insert(0, Candidate(d, "wikidata_website", url))
+                cands.insert(0, Candidate(d, getattr(src, "candidate_origin", "wikidata_website"), url))
                 have.add(d)
     exists = await asyncio.gather(*(ctx.resolver.exists(c.domain) for c in cands))
     live = [c for c, ok in zip(cands, exists) if ok]
