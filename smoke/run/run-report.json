@@ -1,9 +1,9 @@
 {
-  "run_id": "smoke-2026-10-14",
+  "run_id": "smoke-2026-10-14b",
   "agent": "kildespor 0.1.0",
-  "started_at": "2026-10-14T14:58:20Z",
-  "completed_at": "2026-10-14T15:03:48Z",
-  "runtime_seconds": 328.2,
+  "started_at": "2026-10-14T15:26:20Z",
+  "completed_at": "2026-10-14T15:31:49Z",
+  "runtime_seconds": 329.8,
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -16,8 +16,8 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "claims": 6581,
-  "evidence_records": 6543,
+  "claims": 6682,
+  "evidence_records": 6644,
   "companies_with_claims_by_family": {
     "identity": 100,
     "financials": 100,
@@ -74,26 +74,26 @@
   },
   "changes": 0,
   "operations": {
-    "requests": 11494,
-    "bytes": 225631314,
+    "requests": 11519,
+    "bytes": 225623642,
     "by_source": {
-      "robots": 339,
+      "robots": 343,
       "ted": 1,
       "wikidata": 1,
-      "brreg": 405,
-      "regnskap": 163,
+      "brreg": 408,
+      "regnskap": 172,
       "nav_jobs": 1,
       "arbeidstilsynet": 2,
       "smilefjes": 1,
-      "website": 371,
-      "fagfolkguiden": 100,
-      "finanstilsynet": 100,
-      "nav_jobs_index": 9905,
+      "website": 369,
+      "fagfolkguiden": 109,
       "stotteregisteret": 100,
+      "finanstilsynet": 100,
+      "nav_jobs_index": 9907,
       "website_feed": 5
     },
-    "p50_company_ms": 57422,
-    "p95_company_ms": 87625,
+    "p50_company_ms": 61952,
+    "p95_company_ms": 92077,
     "third_party_cost_usd": 0.0,
     "dns_timeouts": 6
   },
@@ -104,14 +104,14 @@
       "error": null,
       "prepare_seconds": 0.0,
       "companies_with_state_aid": 8,
-      "companies_with_account_copies": 61,
-      "account_copy_rate_limit_pauses": 2
+      "companies_with_account_copies": 71,
+      "account_copy_rate_limit_pauses": 1
     },
     {
       "name": "smilefjes",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 19.8,
+      "prepare_seconds": 19.0,
       "organisations_in_file": 8004,
       "companies_matched": 1
     },
@@ -134,7 +134,7 @@
       "name": "arbeidstilsynet",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 11.4,
+      "prepare_seconds": 12.0,
       "companies_in_registers": 1,
       "matched": 1
     },
@@ -150,15 +150,15 @@
       "name": "nav_jobs",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 327.3,
+      "prepare_seconds": 329.0,
       "feed_pages": 157,
       "ads_in_window": 43749,
-      "active_ads": 9737,
-      "detail_requests": 9748,
+      "active_ads": 9739,
+      "detail_requests": 9750,
       "companies_matched": 0,
       "ads_published": 0,
       "window_days": 75,
-      "active_ads_indexed_by_orgnr": 9518,
+      "active_ads_indexed_by_orgnr": 9526,
       "index_cache_hits": 0,
       "index_complete": true,
       "walker_errors": []
@@ -167,7 +167,7 @@
       "name": "wikidata",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 0.8,
+      "prepare_seconds": 1.1,
       "companies_with_items": 1,
       "matched": 1
     }

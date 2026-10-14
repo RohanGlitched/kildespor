@@ -41,8 +41,8 @@ envelopes, run report, the evidence archive and the `verify` report.
 | | Smoke test (100) | Development run (1,000) |
 |---|---:|---:|
 | Envelopes / validation | 100 / passed | 1000 / passed |
-| Facts | 6,581 | 63,909 |
-| Evidence records, hash found in archive | 6,543, all | 63,532 |
+| Facts | 6,682 | 63,909 |
+| Evidence records, hash found in archive | 6,644, all | 63,532 |
 | Runtime from a cold start | 5.5 min | 8.2 min ¹ |
 | Third-party cost | $0 | $0 |
 

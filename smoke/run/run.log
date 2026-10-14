@@ -1,9 +1,9 @@
-25/100 companies · 11483 requests · 328s
-50/100 companies · 11483 requests · 328s
-75/100 companies · 11483 requests · 328s
-100/100 companies · 11494 requests · 328s
+25/100 companies · 11508 requests · 329s
+50/100 companies · 11508 requests · 329s
+75/100 companies · 11508 requests · 329s
+100/100 companies · 11519 requests · 330s
 {
-  "run_id": "smoke-2026-10-14",
+  "run_id": "smoke-2026-10-14b",
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -16,5 +16,5 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "runtime_seconds": 328.2
+  "runtime_seconds": 329.8
 }
