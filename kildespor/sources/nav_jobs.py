@@ -36,6 +36,7 @@ def _sig(name: str) -> tuple[str, ...]:
 class NavJobs(Source):
     name = "nav_jobs"
     families = ["jobs"]
+    late = True
 
     def __init__(self, window_days: int = WINDOW_DAYS) -> None:
         self.window_days = window_days
@@ -47,9 +48,10 @@ class NavJobs(Source):
         self.matched_companies = 0
         self.published = 0
         self.detail_cache: dict[str, dict | None] = {}
-        self.sem = asyncio.Semaphore(12)
+        self.sem = asyncio.Semaphore(16)
         self.by_orgnr: dict[str, list[str]] = {}
         self.indexed = 0
+        self.cache_hits = 0
 
     def _h(self, extra: dict | None = None) -> dict:
         return {"Authorization": "Bearer " + self.token, "Accept": "application/json", **(extra or {})}
@@ -75,9 +77,23 @@ class NavJobs(Source):
                 self.by_token.setdefault(t, []).append(uuid)
         # index every active ad by its employer's organisation number (NAV's intended consumer pattern)
         active = [u for u, e in self.ads.items() if e.get("status") == "ACTIVE"]
+        cache_path = getattr(ctx, "cache_dir", None)
+        cache_path = cache_path / "nav-employer-orgnr.json" if cache_path else None
+        known: dict[str, str] = {}
+        if cache_path and cache_path.exists():
+            try:
+                known = json.loads(cache_path.read_text(encoding="utf-8"))
+            except ValueError:
+                known = {}
         async def one(u: str) -> None:
-            d, _ = await self._detail(ctx, u)
-            org = re.sub(r"\D", "", (((d or {}).get("ad_content") or {}).get("employer") or {}).get("orgnr") or "")
+            org = known.get(u)
+            if org is None:
+                d, _ = await self._detail(ctx, u)
+                org = re.sub(r"\D", "", (((d or {}).get("ad_content") or {}).get("employer") or {}).get("orgnr") or "")
+                if d is not None:
+                    known[u] = org
+            else:
+                self.cache_hits += 1
             if org:
                 self.by_orgnr.setdefault(org, []).append(u)
                 self.indexed += 1
@@ -86,6 +102,10 @@ class NavJobs(Source):
         for t in pending:
             t.cancel()
         self.index_complete = not pending
+        if cache_path:
+            keep = {u: known[u] for u in self.ads if u in known}
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text(json.dumps(keep, separators=(",", ":")), encoding="utf-8")
 
     async def _walk(self, ctx, start: datetime, stop: datetime | None) -> None:
         f = await ctx.client.get("nav_jobs_index", BASE + "/api/v1/feed", retries=3, timeout=45,
@@ -202,5 +222,5 @@ class NavJobs(Source):
         return {"feed_pages": self.pages, "ads_in_window": len(self.ads),
                 "active_ads": sum(1 for e in self.ads.values() if e.get("status") == "ACTIVE"),
                 "detail_requests": self.details, "companies_matched": self.matched_companies, "ads_published": self.published,
-                "window_days": self.window_days, "active_ads_indexed_by_orgnr": self.indexed,
+                "window_days": self.window_days, "active_ads_indexed_by_orgnr": self.indexed, "index_cache_hits": self.cache_hits,
                 "index_complete": getattr(self, "index_complete", False), "walker_errors": getattr(self, "walker_errors", [])}

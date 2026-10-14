@@ -179,15 +179,16 @@ class Resolver:
         async with self.lock:
             if self.ready:
                 return
-            good = []
-            for ns in list(dict.fromkeys(list(self.r.nameservers) + PUBLIC_DNS)):
-                probe = dns.asyncresolver.Resolver(configure=False)
-                probe.nameservers = [ns]
+            async def probe(ns: str) -> str | None:
+                r = dns.asyncresolver.Resolver(configure=False)
+                r.nameservers = [ns]
                 try:
-                    await probe.resolve("brreg.no", "A", lifetime=2.0)
-                    good.append(ns)
+                    await r.resolve("brreg.no", "A", lifetime=2.0)
+                    return ns
                 except dns.exception.DNSException:
-                    continue
+                    return None
+            servers = list(dict.fromkeys(list(self.r.nameservers) + PUBLIC_DNS))
+            good = [ns for ns in await asyncio.gather(*(probe(ns) for ns in servers)) if ns]
             if good:
                 self.r.nameservers = good
             else:

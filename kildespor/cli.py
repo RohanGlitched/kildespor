@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from . import __version__
-from .agent import Context, research
+from .agent import Context, finish, research
 from .claims import FAMILIES, Profile
 from .discovery import Resolver
 from .envelope import build
@@ -143,12 +143,9 @@ async def run(args: argparse.Namespace) -> int:
     client = Client(concurrency=args.concurrency, snapshot_dir=None if args.no_snapshots else snapshots)
     resolver = Resolver()
     ctx = Context(client, resolver, default_sources(args), bulk)
+    ctx.cache_dir = out.parent / ".kildespor-cache"  # declared external cache: NAV ad -> employer organisation number
     for src in ctx.sources:
-        try:
-            await src.prepare(ctx, orgs)
-        except Exception as exc:  # a run-wide source that cannot start is reported per company
-            src.prepare_error = repr(exc)
-            print(f"warning: {src.name} could not start: {exc!r}", file=sys.stderr)
+        src.start(ctx, orgs)  # all run-wide downloads and indexes build in the background
     deadline = t0 + args.budget_minutes * 60 if args.budget_minutes else None
     sem = asyncio.Semaphore(args.companies_in_flight)
     results: dict[str, dict] = {}
@@ -177,19 +174,30 @@ async def run(args: argparse.Namespace) -> int:
                 for fam in FAMILIES:
                     if not p.family_claims(fam):
                         p.mark(fam, "failed", f"unexpected error: {type(exc).__name__}")
-            ops = {"requests": client.stats.requests - req0, "runtime_ms": int((time.monotonic() - c0) * 1000),
-                   "third_party_cost_usd": 0.0}
-            env = build(p, run_id=run_id, started_at=started, completed_at=utc_now(), operations=ops, changes=None,
-                        trace=trace if args.trace else None)
-            ch = diff(env, previous.get(org))
-            env["changes"] = ch.pop("events")
-            env["refresh"] = ch
-            env["sections"]["refresh"].update({"previous_run_id": ch.get("previous_run_id"), "changes": len(env["changes"])})
-            env["summary"]["sentences"].append(change_sentence(env, ch))
-            results[org] = env
-            done += 1
-            if done % 25 == 0 or done == len(orgs):
-                print(f"{done}/{len(orgs)} companies · {client.stats.requests} requests · {time.monotonic() - t0:.0f}s", file=sys.stderr)
+            research_ms = int((time.monotonic() - c0) * 1000)
+        # late sources (the NAV job index) run after the research slot is released
+        if "late_args" in p.notes:
+            try:
+                await asyncio.wait_for(finish(ctx, p, trace), timeout=max(60.0, (deadline - time.monotonic() - 20) if deadline else 900))
+            except asyncio.TimeoutError:
+                p.error("runner", "late sources did not finish within the budget")
+                if not p.family_claims("jobs"):
+                    p.mark("jobs", "failed", "the job index was not ready within the time budget")
+            except Exception as exc:
+                p.error("runner", repr(exc))
+        ops = {"requests": client.stats.requests - req0, "runtime_ms": research_ms,
+               "third_party_cost_usd": 0.0}
+        env = build(p, run_id=run_id, started_at=started, completed_at=utc_now(), operations=ops, changes=None,
+                    trace=trace if args.trace else None)
+        ch = diff(env, previous.get(org))
+        env["changes"] = ch.pop("events")
+        env["refresh"] = ch
+        env["sections"]["refresh"].update({"previous_run_id": ch.get("previous_run_id"), "changes": len(env["changes"])})
+        env["summary"]["sentences"].append(change_sentence(env, ch))
+        results[org] = env
+        done += 1
+        if done % 25 == 0 or done == len(orgs):
+            print(f"{done}/{len(orgs)} companies · {client.stats.requests} requests · {time.monotonic() - t0:.0f}s", file=sys.stderr)
 
     await asyncio.gather(*(one(o) for o in orgs))
     await client.close()
@@ -252,6 +260,7 @@ def make_report(results: dict, orgs: list[str], run_id: str, started: str, t0: f
                        "p95_company_ms": lat[min(len(lat) - 1, int(len(lat) * 0.95))] if lat else None,
                        "third_party_cost_usd": 0.0},
         "sources": [{"name": s.name, "prepared": not getattr(s, "prepare_error", None), "error": getattr(s, "prepare_error", None),
+                     "prepare_seconds": getattr(s, "prepare_seconds", None),
                      **getattr(s, "report", lambda: {})()} for s in ctx.sources],
     }
 

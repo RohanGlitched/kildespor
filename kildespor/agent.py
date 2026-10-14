@@ -9,7 +9,7 @@ from . import extract, registry
 from .claims import FAMILIES, Profile
 from .discovery import Candidate, Resolver, candidates, domain_of, registrable
 from .http import Client
-from .site import SiteResult, complete, crawl, verify
+from .site import SiteResult, complete, crawl, sibling_check, verify
 
 MAX_NAME_CANDIDATES = 5
 MAX_EXACT_SITES = 2
@@ -57,6 +57,11 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     cands = candidates(ent, subunits)
     have = {c.domain for c in cands}
     for src in ctx.sources:
+        if hasattr(src, "website_candidates") and src._task is not None and not src._task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(src._task), timeout=5)
+            except asyncio.TimeoutError:
+                continue  # still downloading: discovery goes on without its candidates
         for url in getattr(src, "website_candidates", lambda o: [])(orgnr):
             d = domain_of(url)
             if d and d not in have:
@@ -76,6 +81,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         results = await asyncio.gather(*(crawl(ctx.client, c) for c in group))
         for res in results:
             res = verify(res, ent, subunits, orgnr, people)
+            res = await sibling_check(ctx.client, res, ent, orgnr, subunits)
             trace["sites"].append({"domain": res.candidate.domain, "origin": res.candidate.origin, "status": res.status,
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})
@@ -111,13 +117,34 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     trace["t_website_ms"] = int((time.monotonic() - t0) * 1000)
     # --- run-wide connectors ------------------------------------------------------------
     for src in ctx.sources:
-        try:
-            await src.enrich(ctx, p, ent, subunits, exact)
-        except Exception as exc:  # each connector fails alone
-            p.error(getattr(src, "name", "connector"), repr(exc))
-            for fam in getattr(src, "families", []):
-                if not p.family_claims(fam):
-                    p.mark(fam, "failed", f"{getattr(src, 'name', 'connector')} failed: {type(exc).__name__}")
+        if src.late:
+            continue
+        await src.wait_ready()
+        await _enrich(ctx, src, p, ent, subunits, exact)
+    p.notes["late_args"] = (ent, subunits, exact, cands, orgnr)
+    trace["runtime_ms"] = int((time.monotonic() - t0) * 1000)
+    return p, trace
+
+
+async def _enrich(ctx: Context, src, p: Profile, ent: dict, subunits: list, exact: list) -> None:
+    try:
+        await src.enrich(ctx, p, ent, subunits, exact)
+    except Exception as exc:  # each connector fails alone
+        p.error(getattr(src, "name", "connector"), repr(exc))
+        for fam in getattr(src, "families", []):
+            if not p.family_claims(fam):
+                p.mark(fam, "failed", f"{getattr(src, 'name', 'connector')} failed: {type(exc).__name__}")
+
+
+async def finish(ctx: Context, p: Profile, trace: dict) -> None:
+    """Late sources (they wait for a run-wide index) and anything they unlock, after the research slot."""
+    ent, subunits, exact, cands, orgnr = p.notes.pop("late_args")
+    people = [c.value for c in p.family_claims("people") if c.field == "registered_role"]
+    for src in ctx.sources:
+        if not src.late:
+            continue
+        await src.wait_ready()
+        await _enrich(ctx, src, p, ent, subunits, exact)
     # employer homepages stated in matched job ads are one more declared candidate
     if not exact and p.notes.get("nav_homepages"):
         extra = []
@@ -136,5 +163,3 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
                 p.states.pop("website", None)
                 extract.add_website(p, res)
                 extract.add_site_claims(p, res, ent)
-    trace["runtime_ms"] = int((time.monotonic() - t0) * 1000)
-    return p, trace

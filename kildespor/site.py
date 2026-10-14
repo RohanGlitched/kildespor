@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
+from urllib.parse import quote
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
@@ -254,7 +256,7 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
         own_core = " ".join(name_tokens(ent.get("navn", "")))
         for page in res.pages:
             hay = f"{page.title}\n{page.text}"
-            for m in sp.OPERATOR_RE.finditer(hay):
+            for m in list(sp.OPERATOR_RE.finditer(hay)) + list(sp.OPERATOR_AFTER_RE.finditer(hay)):
                 named = re.sub(r"[^a-z0-9 ]", "", fold(m.group(1))).strip()
                 named_core = " ".join(name_tokens(m.group(1)))
                 if named and named != own and named_core != own_core:
@@ -291,6 +293,45 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
     # sister companies are often declared (audit: 2 of 12 such sites were the entity's own). It stays a registry fact.
     res.status = "ambiguous"
     res.reason = res.reason or "no organisation number, registered phone, e-mail or address on the site"
+    return res
+
+
+async def sibling_check(client: Client, res: SiteResult, ent: dict, orgnr: str, subunits: list[dict]) -> SiteResult:
+    """A site proven without the organisation number is withheld when its brand stem is the exact name of
+    another active entity (sister companies share addresses, phones and owners)."""
+    if res.status != "exact" or any(p.kind == "orgnr" for p in res.proofs):
+        return res
+    own = {orgnr} | {u.get("organisation_number") for u in subunits}
+    stems: list[str] = []
+    label = res.domain.split(".")[0]
+    if label and label != res.domain:
+        stems.append(label.replace("-", " "))
+    for page in res.pages[:1]:
+        for x in (page.site_name, page.title.split("|")[0].split(" - ")[0].split(" – ")[0]):
+            core = " ".join(name_tokens(x or ""))
+            if core and len(core) >= 4:
+                stems.append(core)
+    own_core = " ".join(name_tokens(ent.get("navn", "")))
+    for stem in dict.fromkeys(stems):
+        if " ".join(name_tokens(stem)) == own_core:
+            continue
+        f = await client.get("brreg", "https://data.brreg.no/enhetsregisteret/api/enheter?size=20&navn=" + quote(stem),
+                             headers={"Accept": "application/json"}, check_robots=False, retries=1)
+        if not f.ok:
+            continue
+        try:
+            rows = (json.loads(f.body).get("_embedded") or {}).get("enheter") or []
+        except ValueError:
+            continue
+        for r in rows:
+            if r.get("organisasjonsnummer") in own or r.get("slettedato") or r.get("konkurs"):
+                continue
+            other_core = " ".join(name_tokens(r.get("navn", "")))
+            if other_core and other_core == " ".join(name_tokens(stem)):
+                res.status = "other_entity"
+                res.reason = f"brand stem '{stem}' is the registered name of {r.get('navn')} ({r.get('organisasjonsnummer')})"
+                res.other_orgnrs = [r.get("organisasjonsnummer")]
+                return res
     return res
 
 

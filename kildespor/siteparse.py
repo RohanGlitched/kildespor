@@ -11,6 +11,9 @@ from selectolax.parser import HTMLParser
 ORGNR_RE = re.compile(r"(?<![\d])(\d{3})[\s .\-]?(\d{3})[\s .\-]?(\d{3})(?![\d])")
 ORGNR_LABEL_RE = re.compile(r"(org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|organi[sz]ation\s*(?:number|no\.?|nr)|company\s*(?:reg(?:istration)?\.?\s*)?(?:number|no\.?)|business\s*(?:id|number)|foretaksregisteret|enhetsregisteret|mva|vat)", re.I)
 OPERATOR_RE = re.compile(r"(?:©|\(c\)|copyright|drevet av|driftet av|behandlingsansvarlig(?:\s+er)?|datakontroll[øo]r(?:\s+er)?|personvernansvarlig(?:\s+er)?|data\s*controller(?:\s+is)?|ansvarlig for (?:nettstedet|siden)|vilkårene gjelder(?:\s+for)?)[^\n]{0,80}?((?:[A-ZÆØÅ][\wæøåÆØÅ&.\-]*\s+){0,5}(?:AS|ASA|ANS|DA|SA|BA|NUF|IL|BBL|Gruppen|Group|Konsern|Idrettslag|Boligbyggelag|Forening|Stiftelse))(?![\wæøå])")
+OPERATOR_AFTER_RE = re.compile(r"((?:[A-ZÆØÅ][\wæøåÆØÅ&.\-]*\s+){0,5}(?:AS|ASA|ANS|DA|SA|BA|NUF|IL|BBL|Gruppen|Group|Konsern|"
+                               r"Idrettslag|Boligbyggelag|Forening|Stiftelse))\s+(?:er|is)\s+(?:the\s+)?(?:behandlingsansvarlig|"
+                               r"data\s*controller|ansvarlig for (?:nettstedet|siden|behandlingen))")
 LABELLED_NUMBER_RE = re.compile(r"(?:org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|organi[sz]ation\s*(?:number|no\.?|nr)|foretaksregisteret)[\s:.]*((?:NO[\s\u00a0]?)?\d{3}[\s\u00a0.]?\d{3}[\s\u00a0.]?\d{3})", re.I)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?<![\d])(?:\+47[\s ]?|0047[\s ]?)?(\d{2}[\s ]?\d{2}[\s ]?\d{2}[\s ]?\d{2}|\d{3}[\s ]?\d{2}[\s ]?\d{3})(?![\d])")
@@ -177,6 +180,9 @@ def emails(page: Page) -> list[str]:
             found.append(e)
     seen, out = set(), []
     for e in found:
+        local = e.split("@")[0]
+        if re.search(r"[-_.](se|dk|fi|uk|us|de|nl|pl)$", local):
+            continue  # a foreign sister's mailbox
         if e not in seen and not e.startswith(("example@", "navn@", "name@", "your@", "din@")):
             seen.add(e)
             out.append(e)
@@ -209,6 +215,8 @@ def phones(page: Page) -> list[tuple[str, str]]:
     out: dict[str, str] = {}
     for href, text in page.links:
         if href.lower().startswith("tel:"):
+            if re.search(r"fax|faks", text or "", re.I):
+                continue
             d = _norwegian(unquote(href[4:]))
             if d:
                 out.setdefault(d, f"{href[4:]} · {text}" if text else href[4:])
