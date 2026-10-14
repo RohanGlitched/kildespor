@@ -27,7 +27,7 @@ MAX_BODY = 3_000_000
 # public APIs that are built for parallel clients; every other host gets one request at a time
 HOST_LIMITS = {"data.brreg.no": 16, "stottetiltak-registerinfo-api.app.brreg.no": 8, "api.ted.europa.eu": 2, "api.finanstilsynet.no": 6, "www.fagfolkguiden.no": 6, "pam-stilling-feed.nav.no": 16, "query.wikidata.org": 2, "w2.brreg.no": 2,
                "www.youtube.com": 4, "news.google.com": 2}
-TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+TIMEOUT = httpx.Timeout(10.0, connect=8.0)
 
 
 @dataclass

@@ -57,7 +57,7 @@ class NavJobs(Source):
         return {"Authorization": "Bearer " + self.token, "Accept": "application/json", **(extra or {})}
 
     async def prepare(self, ctx, orgs: list[str]) -> None:
-        f = await ctx.client.get(self.name, BASE + "/api/publicToken", check_robots=False)
+        f = await ctx.client.get(self.name, BASE + "/api/publicToken", check_robots=False, retries=4, timeout=30)
         if not f.ok:
             raise RuntimeError(f"NAV public token unavailable ({f.status or f.error})")
         lines = [x.strip() for x in f.text().splitlines() if x.strip()]

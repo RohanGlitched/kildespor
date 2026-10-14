@@ -258,7 +258,7 @@ def make_report(results: dict, orgs: list[str], run_id: str, started: str, t0: f
         "operations": {"requests": client.stats.requests, "bytes": client.stats.bytes, "by_source": client.stats.by_source,
                        "p50_company_ms": lat[len(lat) // 2] if lat else None,
                        "p95_company_ms": lat[min(len(lat) - 1, int(len(lat) * 0.95))] if lat else None,
-                       "third_party_cost_usd": 0.0},
+                       "third_party_cost_usd": 0.0, "dns_timeouts": getattr(ctx.resolver, "timeouts", 0)},
         "sources": [{"name": s.name, "prepared": not getattr(s, "prepare_error", None), "error": getattr(s, "prepare_error", None),
                      "prepare_seconds": getattr(s, "prepare_seconds", None),
                      **getattr(s, "report", lambda: {})()} for s in ctx.sources],

@@ -165,7 +165,7 @@ class Resolver:
     (stale adapters are common) and public resolvers are kept as a fallback; if dnspython cannot
     answer at all, the operating system's resolver is used."""
 
-    def __init__(self, concurrency: int = 256) -> None:
+    def __init__(self, concurrency: int = 64) -> None:
         self.r = dns.asyncresolver.Resolver()
         self.r.lifetime = 3.0
         self.r.timeout = 1.5
@@ -174,6 +174,7 @@ class Resolver:
         self.ready = False
         self.lock = asyncio.Lock()
         self.system_fallback = False
+        self.timeouts = 0
 
     async def _init(self) -> None:
         async with self.lock:
@@ -191,38 +192,55 @@ class Resolver:
             good = [ns for ns in await asyncio.gather(*(probe(ns) for ns in servers)) if ns]
             if good:
                 self.r.nameservers = good
+                self.r.rotate = True
             else:
                 self.system_fallback = True
             self.ready = True
+
+    async def _host(self, host: str) -> bool | None:
+        """True: resolves. False: the name does not exist. None: no definite answer (timeouts)."""
+        for attempt in range(3):
+            for rtype in ("A", "AAAA"):
+                try:
+                    await self.r.resolve(host, rtype)
+                    return True
+                except dns.resolver.NXDOMAIN:
+                    return False
+                except (dns.resolver.NoAnswer, dns.name.LabelTooLong, dns.name.EmptyLabel, ValueError):
+                    continue
+                except (dns.resolver.NoNameservers, dns.exception.Timeout):
+                    break  # try again; the resolver rotates to the next server
+                except dns.exception.DNSException:
+                    continue
+            else:
+                return False  # answered, but no address records
+        try:  # last resort: the operating system's resolver
+            await asyncio.wait_for(asyncio.to_thread(socket.getaddrinfo, host, 443), 5)
+            return True
+        except (OSError, asyncio.TimeoutError):
+            return None
 
     async def exists(self, domain: str) -> bool:
         if not self.ready:
             await self._init()
         if domain in self.cache:
             return self.cache[domain]
-        ok = False
         async with self.sem:
             if self.system_fallback:
+                ok = False
                 for host in (domain, "www." + domain):
                     try:
-                        await asyncio.wait_for(asyncio.to_thread(socket.getaddrinfo, host, 443), 4)
+                        await asyncio.wait_for(asyncio.to_thread(socket.getaddrinfo, host, 443), 5)
                         ok = True
                         break
                     except (OSError, asyncio.TimeoutError):
                         continue
-            else:
-                for host, rtype in itertools.product((domain, "www." + domain), ("A", "AAAA")):
-                    try:
-                        await self.r.resolve(host, rtype)
-                        ok = True
-                        break
-                    except dns.resolver.NXDOMAIN:
-                        if rtype == "A":
-                            break  # the name does not exist: no point asking for AAAA
-                    except (dns.resolver.NoAnswer, dns.resolver.NoNameservers, dns.exception.Timeout,
-                            dns.name.LabelTooLong, dns.name.EmptyLabel, ValueError):
-                        continue
-                    except dns.exception.DNSException:
-                        continue
-        self.cache[domain] = ok
+                self.cache[domain] = ok
+                return ok
+            first = await self._host(domain)
+            ok = bool(first) or bool(await self._host("www." + domain)) if first is not True else True
+        if first is not None:
+            self.cache[domain] = ok  # never cache a timeout as "does not exist"
+        else:
+            self.timeouts += 1
         return ok

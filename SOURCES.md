@@ -24,9 +24,13 @@ no paid API, no search-engine scraping, no social-platform scraping. Third-party
 
 - User agent `KildesporBot/1.0 (+https://github.com/RohanGlitched/kildespor; …)`.
 - robots.txt is fetched once per host and obeyed; a 401/403 robots file is treated as "disallow all".
-- One request at a time per company host, 48 requests in flight overall; public APIs have their own
-  small parallel limits (Brreg 8, NAV 12, Finanstilsynet 6, Støtteregisteret 4, TED 2, Wikidata 2), and HTTP 429 is
-  answered with backoff (Retry-After honoured).
+- One request at a time per company host, 96 requests in flight overall. Public APIs get their own
+  limits, set from measurement rather than guesswork: Brønnøysund 16 (its throughput peaks at about
+  33 requests a second; more parallel requests only add latency), NAV 16, Støtteregisteret 8,
+  Finanstilsynet 6, Fagfolkguiden 6, TED 2, Wikidata 2. HTTP 429 is answered with backoff
+  (Retry-After honoured), and the account-copies endpoint is paused for three minutes after a 429.
+- Sources that do not feed website discovery run after a company's research slot is released, so the
+  slow run-wide index (NAV) never holds up the crawl.
 - Only `http`/`https`; hosts resolving to private, loopback, link-local or reserved addresses are
   refused; at most 5 redirects; bodies capped at 3 MB; 10 s read and 5 s connect timeouts, 60 s per candidate site.
 - Raw responses are stored in `snapshots.zip` next to the output, one entry per SHA-256, so every
