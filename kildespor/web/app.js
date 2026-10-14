@@ -112,8 +112,8 @@
     if (typeof c.value === "string" && String(when).slice(0, 10) === c.value.slice(0, 10)) when = "";
     return '<li class="claim"><div><div class="lb">' + esc(c.label) + (c.relationship && c.relationship !== "exact" ? ' <span class="tag">' + esc(c.relationship.replace(/_/g, " ")) + "</span>" : "") +
       (c.carried_forward ? ' <span class="tag closed">kept from previous run</span>' : "") + '</div><div class="vl">' + fmtValue(c) + "</div></div>" +
-      (when ? '<span class="when">' + esc(String(when).replace("..", " – ")) + "</span>" : "") +
-      '<span class="src"><button class="srcbtn" aria-expanded="false" aria-controls="' + id + '" data-ev="' + esc(c.evidence_ids.join(",")) + '">Source</button></span>' +
+      '<div class="side">' + (when ? '<span class="when">' + esc(String(when).replace("..", " – ")) + "</span>" : "") +
+      '<button class="srcbtn" aria-expanded="false" aria-controls="' + id + '" data-ev="' + esc(c.evidence_ids.join(",")) + '">Source</button></div>' +
       '<div id="' + id + '" hidden></div></li>';
   }
   function famSection(env, fam, title, body) {

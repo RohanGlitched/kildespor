@@ -145,7 +145,7 @@ class Client:
                                 max_redirects=max_redirects, timeout=timeout)
             if f.ok or f.blocked or (f.status and f.status < 500 and f.status != 429) or attempt == retries:
                 return f
-            await asyncio.sleep(1.0 * (attempt + 1))
+            await asyncio.sleep((6.0 if f.status == 429 else 1.0) * (attempt + 1))
         return f
 
     async def post(self, source: str, url: str, body: bytes, *, headers: dict | None = None, retries: int = 1) -> Fetched:

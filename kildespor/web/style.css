@@ -114,8 +114,8 @@ section.fam h2 { font-size: 15px; margin: 0; }
 .claim:last-child { border-bottom: 0; }
 .claim .lb { font-size: 12.5px; color: var(--ink-3); }
 .claim .vl { grid-column: 1; overflow-wrap: anywhere; }
-.claim .when { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; grid-row: 1; grid-column: 2; }
-.claim .src { grid-column: 2; grid-row: 2; align-self: start; }
+.claim .side { grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 10px; align-self: start; }
+.claim .when { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
 .srcbtn { border: 1px solid var(--rule); background: transparent; border-radius: 4px; font-size: 12px; padding: 2px 8px; cursor: pointer; min-height: 28px; color: var(--ink-2); }
 .srcbtn[aria-expanded="true"] { background: var(--ink); color: var(--card); }
 .ev { grid-column: 1 / -1; margin-top: 8px; padding: 10px 12px; background: var(--paper); border-radius: 4px; font-size: 13px; display: grid; gap: 4px; }
@@ -129,7 +129,9 @@ section.fam h2 { font-size: 15px; margin: 0; }
 .fin { padding: 14px 16px 6px; }
 .fin svg { width: 100%; height: auto; display: block; }
 .fin table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
-.fin th, .fin td { text-align: right; padding: 5px 4px; border-bottom: 1px solid var(--rule-2); }
+.fin th, .fin td { text-align: right; padding: 5px 4px; border-bottom: 1px solid var(--rule-2); white-space: nowrap; }
+.fin table { font-size: 13px; }
+.fin { overflow-x: auto; }
 .fin th:first-child, .fin td:first-child { text-align: left; color: var(--ink-2); font-weight: 400; }
 .fin thead th { color: var(--ink-3); font-weight: 600; font-size: 12px; }
 .neg { color: var(--red); }

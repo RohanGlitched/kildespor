@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 from ..claims import Claim, Evidence
 from ..util import clip
@@ -39,13 +40,23 @@ class BrregExtra(Source):
     def __init__(self) -> None:
         self.aid_companies = 0
         self.pdf_companies = 0
+        self.copies_paused_until = 0.0
+        self.copies_rate_limited = 0
 
     async def enrich(self, ctx, p, ent, subunits, sites) -> None:
         org = p.orgnr
         c = ctx.client
         p.checked_source("activity", "Brreg update log, state-aid register, registry dates")
-        pdf_f = await c.get("regnskap", PDF_YEARS.format(org), headers={"Accept": "application/json"}, check_robots=False, retries=1)
-        if pdf_f.ok:
+        pdf_f = None
+        if time.monotonic() >= self.copies_paused_until:
+            pdf_f = await c.get("regnskap", PDF_YEARS.format(org), headers={"Accept": "application/json"}, check_robots=False)
+            if pdf_f.status == 429:
+                # the copies endpoint allows ~30 calls per few minutes; pause it instead of hammering
+                self.copies_paused_until = time.monotonic() + 180
+                self.copies_rate_limited += 1
+        if pdf_f is not None and not pdf_f.ok and pdf_f.status not in (404, 429):
+            p.error("regnskap_copies", f"account-copy list failed ({pdf_f.status or pdf_f.error})")
+        if pdf_f is not None and pdf_f.ok:
             try:
                 years = sorted(json.loads(pdf_f.body))
             except ValueError:
@@ -59,6 +70,8 @@ class BrregExtra(Source):
                             key=f"financials:annual_report_copy:{y}"))
         # dated update log
         up = await c.get("brreg", UPDATES.format(org), headers={"Accept": "application/json"}, check_robots=False, retries=1)
+        if not up.ok:
+            p.error("brreg_updates", f"update log failed ({up.status or up.error})")
         if up.ok:
             items = (json.loads(up.body).get("_embedded") or {}).get("oppdaterteEnheter") or []
             by_day: dict[str, list[str]] = {}
@@ -105,6 +118,8 @@ class BrregExtra(Source):
         # state aid
         body = json.dumps([{"field": "STOETTEMOTTAKER_ORGNR", "value": org, "matchType": "EXACT_MATCH"}]).encode()
         aid = await c.post("stotteregisteret", AID, body, headers={"Content-Type": "application/json", "Accept": "application/json"})
+        if not aid.ok:
+            p.error("stotteregisteret", f"state-aid search failed ({aid.status or aid.error})")
         if aid.ok:
             rows = json.loads(aid.body).get("stoettetildeling") or []
             n = 0
@@ -132,4 +147,5 @@ class BrregExtra(Source):
                 self.aid_companies += 1
 
     def report(self) -> dict:
-        return {"companies_with_state_aid": self.aid_companies, "companies_with_account_copies": self.pdf_companies}
+        return {"companies_with_state_aid": self.aid_companies, "companies_with_account_copies": self.pdf_companies,
+                "account_copy_rate_limit_pauses": self.copies_rate_limited}
