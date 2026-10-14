@@ -66,6 +66,13 @@ async def add_registry(client: Client, p: Profile, ent: dict, f: Fetched) -> Non
             c("industry" if i == 1 else f"industry_{i}", f"{n.get('kode')} {n.get('beskrivelse')}", key,
               "Industry (NACE)" if i == 1 else f"Secondary industry {i - 1}")
     c("registered_business_address", _addr(ent.get("forretningsadresse")), "forretningsadresse", "Business address")
+    if ent.get("forretningsadresse"):
+        a = ent["forretningsadresse"]
+        p.add(Claim("locations", "registered_business_address",
+                    {"address": _addr(a), "municipality": a.get("kommune"), "municipality_number": a.get("kommunenummer"),
+                     "country": a.get("land")},
+                    [_ev(f, "forretningsadresse: " + _addr(a), "registry_field")], label="Registered business address",
+                    key="locations:registered_business_address:" + _addr(a).lower()))
     c("postal_address", _addr(ent.get("postadresse")), "postadresse", "Postal address")
     c("municipality", (ent.get("forretningsadresse") or {}).get("kommune"), "forretningsadresse.kommune", "Municipality")
     c("founded", ent.get("stiftelsesdato"), "stiftelsesdato", "Founded", ent.get("stiftelsesdato"))

@@ -102,6 +102,7 @@
       (v.status ? '<span class="tag ' + (v.status === "closed" ? "closed" : "") + '">' + esc(v.status) + "</span>" : "") +
       (v.location ? ' <span class="lb">' + esc(v.location) + "</span>" : "");
     if (v.name && v.role) return esc(v.name) + (v.kind === "organisation" ? ' <span class="lb">(organisation' + (v.organisation_number ? " " + esc(v.organisation_number) : "") + ")</span>" : "");
+    if (v.address !== undefined && !v.organisation_number && !v.name) return esc(v.address);
     if (v.organisation_number && v.address !== undefined) return esc(v.name || "") + '<br><span class="lb">' + esc(v.address) + (v.registered_employees != null ? " · " + esc(v.registered_employees) + " registered employees" : "") + "</span>";
     if (v.label) return esc(v.label);
     return esc(JSON.stringify(v));
