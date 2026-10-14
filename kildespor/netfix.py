@@ -40,10 +40,11 @@ def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):  # noqa: A002 -
     try:
         return _original(host, port, family, type, proto, flags)
     except socket.gaierror:
-        if not isinstance(host, str) or not host or host.replace(".", "").isdigit():
+        name = host.decode("idna") if isinstance(host, (bytes, bytearray)) else host  # anyio passes IDNA bytes
+        if not isinstance(name, str) or not name or name.replace(".", "").isdigit():
             raise
         out = []
-        for ip in _public(host):
+        for ip in _public(name):
             try:
                 out += _original(ip, port, family, type, proto, flags | socket.AI_NUMERICHOST)
             except socket.gaierror:

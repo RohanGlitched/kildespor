@@ -251,3 +251,18 @@ def test_source_has_no_control_characters():
     root = pathlib.Path(__file__).resolve().parents[1] / "kildespor"
     bad = [str(p) for p in root.rglob("*.py") if any(c in p.read_text(encoding="utf-8") for c in "\x08\x0c\x0b")]
     assert bad == []
+
+
+def test_resolver_fallback_accepts_idna_bytes(monkeypatch):
+    import socket
+    from kildespor import netfix
+
+    def broken(host, port, family=0, type=0, proto=0, flags=0):
+        if isinstance(host, (bytes, bytearray)) or not host[0].isdigit():
+            raise socket.gaierror(11002, "getaddrinfo failed")
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (host, port))]
+
+    monkeypatch.setattr(netfix, "_original", broken)
+    monkeypatch.setattr(netfix, "_public", lambda name: ["34.128.161.34"] if name == "example.no" else [])
+    assert netfix.getaddrinfo(b"example.no", 443)[0][4][0] == "34.128.161.34"
+    assert netfix.getaddrinfo("example.no", 443)[0][4][0] == "34.128.161.34"
