@@ -25,6 +25,10 @@ class Source:
 
 def default_sources(args: argparse.Namespace) -> list[Source]:
     out: list[Source] = []
+    from .brreg_extra import BrregExtra
+    out.append(BrregExtra())
+    from .smilefjes import Smilefjes
+    out.append(Smilefjes())
     if not getattr(args, "no_jobs", False):
         from .nav_jobs import NavJobs
         out.append(NavJobs())

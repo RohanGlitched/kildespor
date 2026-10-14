@@ -5,13 +5,14 @@ by construction; we still require the item's P2333 value to equal ours character
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from urllib.parse import quote
 
 from ..claims import Claim, Evidence
 from . import Source
 
-ENDPOINT = "https://query.wikidata.org/sparql?format=json&query="
+ENDPOINT = "https://query.wikidata.org/sparql"
 PROPS = {
     "P856": ("website", "official_website_wikidata"),
     "P2013": ("social", "facebook"),
@@ -45,8 +46,8 @@ class Wikidata(Source):
         self.matched = 0
 
     async def prepare(self, ctx, orgs: list[str]) -> None:
-        for i in range(0, len(orgs), 250):
-            chunk = orgs[i: i + 250]
+        for i in range(0, len(orgs), 1200):
+            chunk = orgs[i: i + 1200]
             values = " ".join(f'"{o}"' for o in chunk)
             props = " ".join(f"wdt:{p}" for p in PROPS)
             q = f"""SELECT ?item ?itemLabel ?orgnr ?prop ?value ?valueLabel WHERE {{
@@ -55,8 +56,14 @@ class Wikidata(Source):
   OPTIONAL {{ VALUES ?prop {{ {props} }} ?item ?prop ?value . }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "nb,nn,en". }}
 }}"""
-            f = await ctx.client.get(self.name, ENDPOINT + quote(q), headers={"Accept": "application/sparql-results+json"},
-                                     check_robots=False)
+            f = None
+            for attempt in range(3):
+                f = await ctx.client.post(self.name, ENDPOINT, ("query=" + quote(q)).encode(), retries=0,
+                                          headers={"Accept": "application/sparql-results+json",
+                                                   "Content-Type": "application/x-www-form-urlencoded"})
+                if f.ok:
+                    break
+                await asyncio.sleep(20 * (attempt + 1))
             if not f.ok:
                 raise RuntimeError(f"Wikidata query failed: {f.status or f.error}")
             data = json.loads(f.body)

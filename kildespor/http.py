@@ -24,7 +24,7 @@ from .util import sha256_bytes, utc_now
 USER_AGENT = "KildesporBot/1.0 (+https://github.com/RohanGlitched/kildespor; company research for the Builderr Signalpost challenge)"
 MAX_BODY = 3_000_000
 # public APIs that are built for parallel clients; every other host gets one request at a time
-HOST_LIMITS = {"data.brreg.no": 8, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
+HOST_LIMITS = {"data.brreg.no": 8, "stottetiltak-registerinfo-api.app.brreg.no": 4, "pam-stilling-feed.nav.no": 12, "query.wikidata.org": 2, "w2.brreg.no": 2,
                "www.youtube.com": 4, "news.google.com": 2}
 TIMEOUT = httpx.Timeout(12.0, connect=6.0)
 
@@ -145,6 +145,28 @@ class Client:
                                 max_redirects=max_redirects, timeout=timeout)
             if f.ok or f.blocked or (f.status and f.status < 500 and f.status != 429) or attempt == retries:
                 return f
+            await asyncio.sleep(1.0 * (attempt + 1))
+        return f
+
+    async def post(self, source: str, url: str, body: bytes, *, headers: dict | None = None, retries: int = 1) -> Fetched:
+        """POST to a public API (no robots check: API endpoints, not pages). Same safety and stats as GET."""
+        start = time.monotonic()
+        host = (urlsplit(url).hostname or "").lower()
+        if urlsplit(url).scheme != "https" or await self._is_private(host):
+            return Fetched(url, url, 0, utc_now(), blocked="private_address")
+        f = Fetched(url, url, 0, utc_now(), error="not_sent")
+        for attempt in range(retries + 1):
+            async with self._lock(host), self.sem:
+                try:
+                    resp = await self.client.post(url, content=body, headers=headers, timeout=httpx.Timeout(90.0, connect=10.0))
+                    data = resp.content[:MAX_BODY]
+                    f = Fetched(url, str(resp.url), resp.status_code, utc_now(), resp.headers.get("content-type", ""), data,
+                                sha256_bytes(data), elapsed_ms=int((time.monotonic() - start) * 1000))
+                except (httpx.HTTPError, OSError, ValueError) as exc:
+                    f = Fetched(url, url, 0, utc_now(), error=type(exc).__name__, elapsed_ms=int((time.monotonic() - start) * 1000))
+            self.stats.add(source, f)
+            if f.ok or (f.status and f.status < 500):
+                break
             await asyncio.sleep(1.0 * (attempt + 1))
         return f
 

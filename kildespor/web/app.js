@@ -92,10 +92,12 @@
       return esc(Array.isArray(v) ? v.join(", ") : v);
     }
     if (Array.isArray(v)) return esc(v.join(", "));
+    if (v.title && "amount" in v && !("year" in v)) return (v.url ? '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.title) + "</a>" : esc(v.title)) + (v.amount != null ? ' <span class="lb">' + money(v.amount, v.currency) + "</span>" : "");
     if ("amount" in v && "year" in v) return money(v.amount, v.currency) + ' <span class="lb">' + esc(v.year) + "</span>";
     if ("amount" in v) return money(v.amount, v.currency) + (v.shares ? ' <span class="lb">' + nf.format(v.shares) + " shares</span>" : "");
     if (v.id && v.url && v.label) return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.label) + "</a> " + '<span class="lb">' + esc(v.id) + "</span>";
     if (v.url && (v.platform || v.domain)) return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.domain || v.url.replace(/^https?:\/\/(www\.)?/, "")) + "</a>" + (v.identity_proof ? '<span class="tag">proof: ' + esc(v.identity_proof.join(", ")) + "</span>" : "");
+    if (v.year && v.format === "pdf") return '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">Annual accounts ' + esc(v.year) + " (PDF)</a>";
     if (v.title) return (v.url ? '<a href="' + esc(v.url) + '" target="_blank" rel="noreferrer noopener">' + esc(v.title) + "</a>" : esc(v.title)) +
       (v.status ? '<span class="tag ' + (v.status === "closed" ? "closed" : "") + '">' + esc(v.status) + "</span>" : "") +
       (v.location ? ' <span class="lb">' + esc(v.location) + "</span>" : "");
@@ -123,8 +125,11 @@
     return '<section class="fam" id="f-' + fam + '"><header><h2>' + esc(title) + '</h2><span class="state ' + st.state + '">' + esc(st.state === "available" ? claims.length + " fact" + (claims.length === 1 ? "" : "s") : STATE_WORD[st.state] || st.state) + "</span></header>" + inner + "</section>";
   }
   function finSection(env) {
-    const fin = env.claims.filter((c) => c.family === "financials");
-    if (!fin.length) return famSection(env, "financials", "Annual accounts");
+    const fin = env.claims.filter((c) => c.family === "financials" && c.value && "amount" in c.value);
+    const pdfs = env.claims.filter((c) => c.field === "annual_report_copy").sort((a, b) => b.value.year.localeCompare(a.value.year));
+    if (!fin.length && !pdfs.length) return famSection(env, "financials", "Annual accounts");
+    const pdfHtml = pdfs.length ? '<div class="checked" style="padding:10px 0 4px">Filed copies (PDF): ' + pdfs.map((c) => '<a href="' + esc(c.value.url) + '" target="_blank" rel="noreferrer noopener">' + esc(c.value.year) + "</a>").join(" · ") + "</div>" : "";
+    if (!fin.length) return '<section class="fam" id="f-financials"><header><h2>Annual accounts</h2><span class="state available">' + pdfs.length + ' filed copies</span></header><div class="fin">' + pdfHtml + "</div></section>";
     const years = [...new Set(fin.map((c) => c.value.year))].sort();
     const get = (f, y) => fin.find((c) => c.field === f && c.value.year === y);
     const rowsDef = [["revenue", "Operating revenue"], ["operating_result", "Operating result"], ["annual_result", "Annual result"], ["equity", "Equity"], ["total_assets", "Total assets"], ["total_debt", "Total debt"], ["payroll_cost", "Payroll costs"]];
@@ -151,7 +156,7 @@
       table += "<tr><th>" + label + "</th>" + cells.map((c) => '<td class="' + (c && c.value.amount < 0 ? "neg" : "") + '">' + (c ? money(c.value.amount) : "—") + "</td>").join("") +
         '<td><button class="srcbtn" aria-expanded="false" aria-controls="' + id + '" data-ev="' + ids.join(",") + '">Source</button></td></tr><tr><td colspan="' + (years.length + 2) + '" style="padding:0;border:0"><div id="' + id + '" hidden></div></td></tr>';
     });
-    table += "</tbody></table>";
+    table += "</tbody></table>" + pdfHtml;
     const st = env.field_states.find((s) => s.family === "financials");
     return '<section class="fam" id="f-financials"><header><h2>Annual accounts</h2><span class="state available">' + years.length + " year" + (years.length === 1 ? "" : "s") + ' filed</span></header><div class="fin">' + svg +
       '<div class="legend"><span><i class="available"></i>Operating revenue</span><span><i style="background:var(--fjord);border-color:var(--fjord)"></i>Annual result</span></div>' + table + "</div></section>";

@@ -98,6 +98,8 @@ async def add_registry(client: Client, p: Profile, ent: dict, f: Fetched) -> Non
     for h in ent.get("historiskeNavn") or []:
         if isinstance(h, dict) and h.get("navn"):
             c("former_name", h["navn"], "historiskeNavn", "Former name", h.get("tilDato"))
+    p.notes["entity_retrieved_at"] = f.retrieved_at
+    p.notes["entity_sha"] = f.sha256
     p.checked_source("identity", SRC)
     p.checked_source("contact", SRC)
 
@@ -112,6 +114,8 @@ async def add_roles(client: Client, p: Profile, orgnr: str) -> list[dict]:
     people = []
     for group in data.get("rollegrupper") or []:
         changed = group.get("sistEndret")
+        p.notes.setdefault("role_groups", []).append({"group": (group.get("type") or {}).get("beskrivelse") or "Roles",
+                                                      "changed": changed, "retrieved_at": f.retrieved_at, "sha": f.sha256})
         for r in group.get("roller") or []:
             if r.get("avregistrert") or r.get("fratraadt"):
                 continue

@@ -64,7 +64,7 @@ def summarise(p: Profile) -> dict[str, Any]:
         s.append({"topic": "what_it_does", "text": f"Its website says: “{desc.value[:220]}”", "claim_keys": [desc.key]})
     elif purpose:
         s.append({"topic": "what_it_does", "text": f"Registered purpose: {purpose.value[:220]}", "claim_keys": [purpose.key]})
-    fin = by["financials"]
+    fin = [c for c in by["financials"] if isinstance(c.value, dict) and "amount" in c.value]
     years = sorted({c.value["year"] for c in fin})
     if years:
         y = years[-1]
