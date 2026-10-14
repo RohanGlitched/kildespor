@@ -126,3 +126,23 @@ def test_refresh_keeps_values_when_source_failed():
     ch = diff(b, a)
     assert ch["events"] == [] and ch["carried_forward"] == 1
     assert b["claims"][0]["carried_forward"] is True
+
+
+def test_exact_legal_name_proof_keeps_norwegian_letters():
+    ent = {"navn": "RÅ SERVICE AS", "forretningsadresse": {}}
+    res = SiteResult(Candidate("raservice.no", "name_derived"), "ambiguous", "", home=page("RA Service AS er et firma", url="https://www.raservice.no/", title="RA Service AS"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "933126919").status == "ambiguous"
+    ent2 = {"navn": "FJELLFORM AS", "forretningsadresse": {}}
+    res2 = SiteResult(Candidate("fjellform.no", "name_derived"), "ambiguous", "", home=page("Velkommen", url="https://www.fjellform.no/", title="Fjellform AS"))
+    res2.home.site_name = "Fjellform AS"
+    res2.pages = [res2.home]
+    out = verify(res2, ent2, [], "933355950")
+    assert out.status == "exact" and out.proofs[0].kind == "legal_name"
+
+
+def test_exact_legal_name_needs_a_name_derived_domain():
+    ent = {"navn": "FJELLFORM AS", "forretningsadresse": {}}
+    res = SiteResult(Candidate("fjell.no", "name_derived"), "ambiguous", "", home=page("Kunde: Fjellform AS", url="https://fjell.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "933355950").status == "ambiguous"

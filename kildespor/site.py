@@ -94,6 +94,28 @@ async def crawl(client: Client, cand: Candidate) -> SiteResult:
     return res
 
 
+FORMS = {"AS": "AS", "ASA": "ASA", "ANS": "ANS", "DA": "DA", "SA": "SA", "BA": "BA", "NUF": "NUF", "STI": "", "ENK": ""}
+
+
+def _exact_name_rx(name: str) -> re.Pattern | None:
+    name = re.sub(r"\s+", " ", (name or "").strip())
+    parts = name.split(" ")
+    if len(parts) < 2 or parts[-1].upper() not in FORMS or not FORMS[parts[-1].upper()]:
+        return None
+    core = " ".join(parts[:-1])
+    if len(core.replace(" ", "")) < 4:
+        return None
+    pat = r"(?<![\wæøåÆØÅ])" + r"\s+".join(re.escape(x) for x in parts) + r"(?![\wæøåÆØÅ])"
+    return re.compile(pat, re.I)
+
+
+def _domain_from_name(domain: str, toks: list[str]) -> bool:
+    label = fold(domain.split(".")[0]).replace("-", "")
+    joined = "".join(toks)
+    return bool(label) and len(label) >= 4 and (label == joined or (len(toks) >= 2 and label == "".join(toks[:2])) or
+                                              (label in joined and len(label) >= 0.6 * len(joined)))
+
+
 def _tokens_present(tokens: list[str], hay: str) -> bool:
     words = set(re.findall(r"[a-z0-9]+", fold(hay)))
     return bool(tokens) and all(t in words for t in tokens)
@@ -136,6 +158,21 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str) -> Site
             if has_post and has_street:
                 res.proofs.append(Proof("name_address", f"{ent.get('navn')} · {street} · {', '.join(postcodes)}",
                                         page.final_url, page.sha256, page.retrieved_at, 0.93))
+    # exact legal name with its legal form (e.g. "Fjellform AS") on a site whose domain comes from that name.
+    # Names are unique in the register; letters æ/ø/å and punctuation are kept so "RA Service AS" != "RÅ SERVICE AS".
+    if not res.proofs and not others:
+        legal = _exact_name_rx(ent.get("navn", ""))
+        label_ok = res.candidate.declared or _domain_from_name(res.domain, toks)
+        if legal and label_ok:
+            for page in res.pages:
+                for hay in (page.site_name, page.title, page.text):
+                    m = legal.search(hay or "")
+                    if m:
+                        span = (hay or "")[max(0, m.start() - 50): m.end() + 30].replace("\n", " ")
+                        res.proofs.append(Proof("legal_name", span, page.final_url, page.sha256, page.retrieved_at, 0.9))
+                        break
+                if res.proofs:
+                    break
     res.other_orgnrs = sorted(others)
     if others and not ours_seen:
         # the site names a different legal entity as its operator
