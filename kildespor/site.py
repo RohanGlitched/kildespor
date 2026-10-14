@@ -142,8 +142,10 @@ def _exact_name_rx(name: str) -> re.Pattern | None:
 def _domain_from_name(domain: str, toks: list[str]) -> bool:
     label = fold(domain.split(".")[0]).replace("-", "")
     joined = "".join(toks)
+    prefixes = {"".join(toks[:k]) for k in range(1, len(toks) + 1)}
     return bool(label) and len(label) >= 4 and (label == joined or (len(toks) >= 2 and label == "".join(toks[:2])) or
-                                              (label in joined and len(label) >= 0.6 * len(joined)))
+                                              (label in joined and len(label) >= 0.6 * len(joined)) or
+                                              (label in prefixes and len(label) >= 6))
 
 
 def _tokens_present(tokens: list[str], hay: str) -> bool:
@@ -151,7 +153,7 @@ def _tokens_present(tokens: list[str], hay: str) -> bool:
     return bool(tokens) and all(t in words for t in tokens)
 
 
-def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str) -> SiteResult:
+def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people: list[dict] | None = None) -> SiteResult:
     if res.status in ("unreachable", "parked", "blocked"):
         return res
     sub_orgnrs = {u.get("organisation_number") for u in subunits if u.get("organisation_number")}
@@ -162,7 +164,9 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str) -> Site
     addr = ent.get("forretningsadresse") or {}
     postcodes = {addr.get("postnummer")} | {(u.get("address") or "")[-30:] for u in []}
     postcodes = {p for p in postcodes if p}
-    street = fold((addr.get("adresse") or [""])[0]) if addr.get("adresse") else ""
+    streets = [fold(x) for x in (addr.get("adresse") or []) if x and not fold(x).startswith(("c/o", "co ", "c /o"))]
+    streets = [x for x in streets if len(x) > 5 and re.search(r"\d", x)] or [x for x in streets if len(x) > 5]
+    street = streets[0] if streets else ""
 
     ours_seen = False
     others: dict[str, str] = {}
@@ -184,7 +188,7 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str) -> Site
         if not any(p.kind == "name_address" for p in res.proofs) and _tokens_present(toks, hay):
             folded = fold(hay)
             has_post = any(re.search(rf"(?<!\d){pc}(?!\d)", hay) for pc in postcodes)
-            has_street = bool(street) and len(street) > 5 and street in folded
+            has_street = any(st in folded for st in streets)
             if has_post and has_street:
                 res.proofs.append(Proof("name_address", f"{ent.get('navn')} · {street} · {', '.join(postcodes)}",
                                         page.final_url, page.sha256, page.retrieved_at, 0.93))
@@ -202,6 +206,38 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str) -> Site
                         res.proofs.append(Proof("legal_name", span, page.final_url, page.sha256, page.retrieved_at, 0.9))
                         break
                 if res.proofs:
+                    break
+    if not res.proofs and not others:
+        label_ok = res.candidate.declared or _domain_from_name(res.domain, toks)
+        form = ((ent.get("organisasjonsform") or {}).get("kode") or "").upper()
+        town_words = {fold(x) for x in (addr.get("poststed"), addr.get("kommune")) if x}
+        # housing co-ops, foundations and other forms without "AS" in the name: the exact full name plus the registered town
+        if label_ok and form not in FORMS and len(toks) >= 2:
+            full = re.compile(r"(?<![\wæøåÆØÅ])" + r"\s+".join(re.escape(x) for x in ent.get("navn", "").split()) + r"(?![\wæøåÆØÅ])", re.I)
+            for page in res.pages:
+                hay = "\n".join((page.site_name, page.title, page.text))
+                m = full.search(hay)
+                words = set(re.findall(r"[a-z0-9]+", fold(hay)))
+                if m and any(all(w in words for w in t.split()) for t in town_words):
+                    res.proofs.append(Proof("legal_name_town", hay[max(0, m.start() - 40): m.end() + 40].replace("\n", " "),
+                                            page.final_url, page.sha256, page.retrieved_at, 0.9))
+                    break
+        # a current role holder from the role register named on the site, plus every legal-name token
+        persons = [x["name"] for x in (people or []) if x.get("kind") == "person" and len(x.get("name", "").split()) >= 2]
+        if not res.proofs and persons:
+            for page in res.pages:
+                hay = "\n".join((page.title, page.site_name, page.text))
+                if not _tokens_present(toks, hay):
+                    continue
+                f_hay = " " + " ".join(re.findall(r"[a-z0-9]+", fold(hay))) + " "
+                hits = []
+                for name in persons:
+                    parts = re.findall(r"[a-z0-9]+", fold(name))
+                    if f" {' '.join(parts)} " in f_hay or (len(parts) > 2 and f" {parts[0]} {parts[-1]} " in f_hay):
+                        hits.append(name)
+                if hits:
+                    res.proofs.append(Proof("role_holder_and_name", f"{', '.join(hits[:2])} (role register) and {ent.get('navn')} on the page",
+                                            page.final_url, page.sha256, page.retrieved_at, 0.9 if len(hits) >= 2 else 0.88))
                     break
     res.other_orgnrs = sorted(others)
     if others and not ours_seen:

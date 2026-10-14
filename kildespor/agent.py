@@ -44,7 +44,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     p.notes["entity"] = ent
     await registry.add_registry(ctx.client, p, ent, f)
     trace["t_entity_ms"] = int((time.monotonic() - t0) * 1000)
-    _, subunits, years = await asyncio.gather(
+    people, subunits, years = await asyncio.gather(
         registry.add_roles(ctx.client, p, orgnr),
         registry.add_subunits(ctx.client, p, orgnr),
         registry.add_financials(ctx.client, p, orgnr),
@@ -75,7 +75,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     for group in (declared, guessed):
         results = await asyncio.gather(*(crawl(ctx.client, c) for c in group))
         for res in results:
-            res = verify(res, ent, subunits, orgnr)
+            res = verify(res, ent, subunits, orgnr, people)
             trace["sites"].append({"domain": res.candidate.domain, "origin": res.candidate.origin, "status": res.status,
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})
@@ -124,7 +124,7 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
             if d and d not in {c.domain for c in cands} and await ctx.resolver.exists(d):
                 extra.append(Candidate(d, "job_ad_homepage", url))
         for res in await asyncio.gather(*(crawl(ctx.client, c) for c in extra[:2])):
-            res = verify(res, ent, subunits, orgnr)
+            res = verify(res, ent, subunits, orgnr, people)
             trace["sites"].append({"domain": res.candidate.domain, "origin": res.candidate.origin, "status": res.status,
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})

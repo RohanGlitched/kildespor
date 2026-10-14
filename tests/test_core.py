@@ -151,3 +151,37 @@ def test_exact_legal_name_needs_a_name_derived_domain():
 def test_postcode_town_stays_on_one_line():
     m = sp.POSTCODE_RE.search("Mosseveien 39B, 1610 Fredrikstad\nNorway")
     assert m and m.group(2) == "Fredrikstad"
+
+
+def test_care_of_line_is_skipped_for_street_proof():
+    ent = {"navn": "PLATO CATERING AS", "forretningsadresse": {"adresse": ["c/o Factory Tøyen", "Kjølberggata 21"], "postnummer": "0653"}}
+    res = SiteResult(Candidate("platocatering.no", "name_derived"), "ambiguous", "",
+                     home=page("Plato Catering\nKjølberggata 21, 0653 Oslo", url="https://platocatering.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "999999999").proofs[0].kind == "name_address"
+
+
+def test_role_holder_and_all_name_tokens():
+    ent = {"navn": "CHRISTIAN MEAAS SVENDSEN AS", "forretningsadresse": {}}
+    people = [{"name": "Christian Meaas Svendsen", "kind": "person", "role": "Daglig leder"}]
+    res = SiteResult(Candidate("christianmeaassvendsen.no", "name_derived"), "ambiguous", "",
+                     home=page("Christian Meaas Svendsen – fotograf", url="https://christianmeaassvendsen.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "999999999", people).status == "exact"
+    other = SiteResult(Candidate("svendsen.no", "name_derived"), "ambiguous", "",
+                       home=page("Christian Meaas Svendsen", url="https://svendsen.no/"))
+    other.pages = [other.home]
+    assert verify(other, ent, [], "999999999", []).status == "ambiguous"
+
+
+def test_housing_coop_needs_exact_name_and_town():
+    ent = {"navn": "BREKKENE BORETTSLAG", "organisasjonsform": {"kode": "BRL"},
+           "forretningsadresse": {"poststed": "BERGEN", "kommune": "BERGEN"}}
+    ok = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
+                    home=page("Brekkene Borettslag i Bergen", url="https://brekkene-borettslag.no/"))
+    ok.pages = [ok.home]
+    assert verify(ok, ent, [], "999999999").status == "exact"
+    wrong = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
+                       home=page("Brekkene Borettslag i Haugesund", url="https://brekkene-borettslag.no/"))
+    wrong.pages = [wrong.home]
+    assert verify(wrong, ent, [], "999999999").status == "ambiguous"

@@ -250,9 +250,14 @@ def job_links(page: Page) -> list[tuple[str, str]]:
 
 def internal_links(page: Page, site_host: str) -> dict[str, list[tuple[str, str]]]:
     """Priority internal links by kind."""
+    def reg(h: str) -> str:
+        parts = h.lower().strip(".").split(".")
+        return ".".join(parts[-3:]) if len(parts) >= 3 and parts[-2] in ("co", "com", "org", "net") else ".".join(parts[-2:])
+
     def same(h: str) -> bool:
         h = h.lower()
-        return h == site_host or h == "www." + site_host or site_host == "www." + h or h.endswith("." + site_host.removeprefix("www."))
+        return (h == site_host or h == "www." + site_host or site_host == "www." + h or h.endswith("." + site_host.removeprefix("www."))
+                or (bool(h) and reg(h) == reg(site_host)))
     kinds: dict[str, list[tuple[str, str]]] = {k: [] for k, _ in PRIORITY}
     seen = set()
     for href, text in page.links:
