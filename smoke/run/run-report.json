@@ -1,0 +1,175 @@
+{
+  "run_id": "smoke-2026-10-14",
+  "agent": "kildespor 0.1.0",
+  "started_at": "2026-10-14T14:58:20Z",
+  "completed_at": "2026-10-14T15:03:48Z",
+  "runtime_seconds": 328.2,
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "checks": {
+      "exact_expected_count": true,
+      "unique_organisation_numbers": true,
+      "every_envelope_terminal": true,
+      "every_claim_has_evidence": true,
+      "every_evidence_has_source_time_hash": true
+    }
+  },
+  "claims": 6581,
+  "evidence_records": 6543,
+  "companies_with_claims_by_family": {
+    "identity": 100,
+    "financials": 100,
+    "people": 100,
+    "locations": 100,
+    "website": 9,
+    "contact": 36,
+    "social": 2,
+    "jobs": 1,
+    "activity": 100,
+    "reviews": 0,
+    "description": 100
+  },
+  "field_states_by_family": {
+    "identity": {
+      "available": 100
+    },
+    "financials": {
+      "available": 100
+    },
+    "people": {
+      "available": 100
+    },
+    "locations": {
+      "available": 100
+    },
+    "website": {
+      "blocked": 13,
+      "ambiguous": 41,
+      "not_available": 37,
+      "available": 9
+    },
+    "contact": {
+      "available": 36,
+      "not_available": 64
+    },
+    "social": {
+      "not_available": 98,
+      "available": 2
+    },
+    "jobs": {
+      "not_available": 99,
+      "available": 1
+    },
+    "activity": {
+      "available": 100
+    },
+    "reviews": {
+      "not_available": 100
+    },
+    "description": {
+      "available": 100
+    }
+  },
+  "changes": 0,
+  "operations": {
+    "requests": 11494,
+    "bytes": 225631314,
+    "by_source": {
+      "robots": 339,
+      "ted": 1,
+      "wikidata": 1,
+      "brreg": 405,
+      "regnskap": 163,
+      "nav_jobs": 1,
+      "arbeidstilsynet": 2,
+      "smilefjes": 1,
+      "website": 371,
+      "fagfolkguiden": 100,
+      "finanstilsynet": 100,
+      "nav_jobs_index": 9905,
+      "stotteregisteret": 100,
+      "website_feed": 5
+    },
+    "p50_company_ms": 57422,
+    "p95_company_ms": 87625,
+    "third_party_cost_usd": 0.0,
+    "dns_timeouts": 6
+  },
+  "sources": [
+    {
+      "name": "brreg_extra",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 0.0,
+      "companies_with_state_aid": 8,
+      "companies_with_account_copies": 61,
+      "account_copy_rate_limit_pauses": 2
+    },
+    {
+      "name": "smilefjes",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 19.8,
+      "organisations_in_file": 8004,
+      "companies_matched": 1
+    },
+    {
+      "name": "ted",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 2.2,
+      "queries": 1,
+      "companies_with_awards": 1
+    },
+    {
+      "name": "finanstilsynet",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 0.0,
+      "companies_matched": 0
+    },
+    {
+      "name": "arbeidstilsynet",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 11.4,
+      "companies_in_registers": 1,
+      "matched": 1
+    },
+    {
+      "name": "fagfolkguiden",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 0.0,
+      "exact_pages": 11,
+      "rated": 0
+    },
+    {
+      "name": "nav_jobs",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 327.3,
+      "feed_pages": 157,
+      "ads_in_window": 43749,
+      "active_ads": 9737,
+      "detail_requests": 9748,
+      "companies_matched": 0,
+      "ads_published": 0,
+      "window_days": 75,
+      "active_ads_indexed_by_orgnr": 9518,
+      "index_cache_hits": 0,
+      "index_complete": true,
+      "walker_errors": []
+    },
+    {
+      "name": "wikidata",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 0.8,
+      "companies_with_items": 1,
+      "matched": 1
+    }
+  ]
+}

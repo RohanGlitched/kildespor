@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kildespor</title>
+<meta name="description" content="Norwegian company profiles where every fact links to its source.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#/"><b>Kildespor</b><span>Norwegian company research, every fact sourced</span></a>
+  <div class="run" id="runlabel"></div>
+</header>
+<div class="app" id="app">
+  <aside class="list" aria-label="Companies">
+    <div class="controls">
+      <label class="sr" for="q">Search companies</label>
+      <input id="q" class="search" type="search" placeholder="Search name, org.nr, place, website  ( / )" autocomplete="off">
+      <div class="filters" role="group" aria-label="Filters">
+        <button class="chip" data-f="site" aria-pressed="false">Verified website</button>
+        <button class="chip" data-f="social" aria-pressed="false">Profiles</button>
+        <button class="chip" data-f="jobs" aria-pressed="false">Hiring</button>
+        <button class="chip" data-f="changed" aria-pressed="false">Changed</button>
+      </div>
+      <div class="listmeta"><span id="count"></span>
+        <label>Sort <select id="sort"><option value="evidence">Most facts</option><option value="name">Name A–Å</option><option value="revenue">Revenue</option><option value="changes">Changes</option></select></label>
+      </div>
+    </div>
+    <div class="rows" id="rows"></div>
+    <div class="cmpbar" id="cmpbar" hidden><span id="cmpn"></span><span><button class="clear" id="cmpclear">Clear</button> <button id="cmpgo">Compare</button></span></div>
+  </aside>
+  <main class="main" id="main" tabindex="-1"></main>
+</div>
+<script src="data/index.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

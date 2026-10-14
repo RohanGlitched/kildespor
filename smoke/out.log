@@ -1,0 +1,20 @@
+25/100 companies · 11483 requests · 328s
+50/100 companies · 11483 requests · 328s
+75/100 companies · 11483 requests · 328s
+100/100 companies · 11494 requests · 328s
+{
+  "run_id": "smoke-2026-10-14",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "checks": {
+      "exact_expected_count": true,
+      "unique_organisation_numbers": true,
+      "every_envelope_terminal": true,
+      "every_claim_has_evidence": true,
+      "every_evidence_has_source_time_hash": true
+    }
+  },
+  "runtime_seconds": 328.2
+}
