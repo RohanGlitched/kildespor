@@ -10,7 +10,8 @@ from selectolax.parser import HTMLParser
 
 ORGNR_RE = re.compile(r"(?<![\d])(\d{3})[\s .\-]?(\d{3})[\s .\-]?(\d{3})(?![\d])")
 ORGNR_LABEL_RE = re.compile(r"(org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|organi[sz]ation\s*(?:number|no\.?|nr)|company\s*(?:reg(?:istration)?\.?\s*)?(?:number|no\.?)|business\s*(?:id|number)|foretaksregisteret|enhetsregisteret|mva|vat)", re.I)
-OPERATOR_RE = re.compile(r"(?:©|\(c\)|copyright|drevet av|driftet av|behandlingsansvarlig(?:\s+er)?|data\s*controller(?:\s+is)?|ansvarlig for (?:nettstedet|siden))[^\n]{0,60}?((?:[A-ZÆØÅ][\wæøåÆØÅ&.\-]*\s+){0,5}(?:AS|ASA|ANS|DA|SA|BA|NUF))(?![\wæøå])")
+OPERATOR_RE = re.compile(r"(?:©|\(c\)|copyright|drevet av|driftet av|behandlingsansvarlig(?:\s+er)?|datakontroll[øo]r(?:\s+er)?|personvernansvarlig(?:\s+er)?|data\s*controller(?:\s+is)?|ansvarlig for (?:nettstedet|siden)|vilkårene gjelder(?:\s+for)?)[^\n]{0,80}?((?:[A-ZÆØÅ][\wæøåÆØÅ&.\-]*\s+){0,5}(?:AS|ASA|ANS|DA|SA|BA|NUF|IL|BBL|Gruppen|Group|Konsern|Idrettslag|Boligbyggelag|Forening|Stiftelse))(?![\wæøå])")
+LABELLED_NUMBER_RE = re.compile(r"(?:org(?:anisasjons)?\.?\s*-?\s*(?:nr|nummer|no)\.?|organi[sz]ation\s*(?:number|no\.?|nr)|foretaksregisteret)[\s:.]*((?:NO[\s\u00a0]?)?\d{3}[\s\u00a0.]?\d{3}[\s\u00a0.]?\d{3})", re.I)
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?<![\d])(?:\+47[\s ]?|0047[\s ]?)?(\d{2}[\s ]?\d{2}[\s ]?\d{2}[\s ]?\d{2}|\d{3}[\s ]?\d{2}[\s ]?\d{3})(?![\d])")
 POSTCODE_RE = re.compile(r"(?<![\d])(\d{4})[ \t ]+([A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+(?:[ \t ][A-ZÆØÅ][A-Za-zæøåÆØÅ\-]+)?)")
@@ -212,9 +213,11 @@ def phones(page: Page) -> list[tuple[str, str]]:
             if d:
                 out.setdefault(d, f"tel:{href[4:]} {text}")
     for m in PHONE_RE.finditer(page.text):
-        before = page.text[max(0, m.start() - 6): m.start()]
+        before = page.text[max(0, m.start() - 14): m.start()]
+        if re.search(r"fax|faks|telefaks", page.text[max(0, m.start() - 16): m.start()], re.I):
+            continue
         after = page.text[m.end(): m.end() + 3]
-        if re.search(r"\+\s?\d{1,3}[\s\u00a0]?$", before) and not re.search(r"\+\s?47[\s\u00a0]?$", before):
+        if re.search(r"\+\s?\d{1,3}[\s\u00a0]?(?:\(0\)[\s\u00a0]?)?\d{0,4}[\s\u00a0]?$", before) and not re.search(r"\+\s?47[\s\u00a0]?$", before):
             continue  # follows a foreign country code
         if re.match(r"[\s\u00a0]?\d", after):
             continue  # part of a longer number
@@ -229,7 +232,9 @@ def phones(page: Page) -> list[tuple[str, str]]:
 def socials(page: Page) -> list[tuple[str, str, str]]:
     """(platform, canonical url, handle)"""
     out: dict[tuple[str, str], tuple[str, str, str]] = {}
-    for href, _ in page.links:
+    for href, anchor in page.links:
+        if re.search(r"\b(foto|photo|fotograf|photographer|design(?:et)? (?:av|by)|levert av|webdesign)\b", anchor or "", re.I):
+            continue
         for platform, rx in SOCIAL_PATTERNS.items():
             m = rx.match(href)
             if not m:

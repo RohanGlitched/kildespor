@@ -105,9 +105,9 @@ async def _crawl(client: Client, cand: Candidate) -> SiteResult:
         for i, (u, _) in enumerate(kinds.get(kind, [])[:2 if kind in ("contact", "about") else 1]):
             if u in first or u in later or u.rstrip("/") == home.final_url.rstrip("/"):
                 continue
-            (first if kind in ("contact", "about", "privacy") and i == 0 else later).append(u)
+            (first if kind in ("contact", "about", "privacy") and (i == 0 or kind == "privacy") else later).append(u)
     # identity pages first; the rest only once the site is proven to be this entity
-    for u in first[:3]:
+    for u in first[:4]:
         page, _ = await fetch_page(client, u)
         if page:
             res.pages.append(page)
@@ -247,13 +247,33 @@ def verify(res: SiteResult, ent: dict, subunits: list[dict], orgnr: str, people:
                                             page.final_url, page.sha256, page.retrieved_at, 0.9 if len(hits) >= 2 else 0.88))
                     break
     if not ours_seen:
-        own = fold(ent.get("navn", ""))
+        own = re.sub(r"[^a-z0-9 ]", "", fold(ent.get("navn", ""))).strip()
+        own_core = " ".join(name_tokens(ent.get("navn", "")))
         for page in res.pages:
-            for m in sp.OPERATOR_RE.finditer(f"{page.title}\n{page.text}"):
-                named = fold(m.group(1)).strip()
-                if named and named != own and not own.startswith(named) and not named.startswith(own.rsplit(" ", 1)[0] + " "):
+            hay = f"{page.title}\n{page.text}"
+            for m in sp.OPERATOR_RE.finditer(hay):
+                named = re.sub(r"[^a-z0-9 ]", "", fold(m.group(1))).strip()
+                named_core = " ".join(name_tokens(m.group(1)))
+                if named and named != own and named_core != own_core:
                     others.setdefault("operator:" + m.group(1).strip(), m.group(0)[:120])
                     break
+            # any labelled organisation number that is not ours, even one that fails the checksum
+            for m in sp.LABELLED_NUMBER_RE.finditer(hay):
+                num = re.sub(r"\D", "", m.group(1))[-9:]
+                if len(num) == 9 and num != orgnr and num not in sub_orgnrs:
+                    others.setdefault(num, m.group(0)[:80])
+    # phone and e-mail prove contact, not identity: a group switchboard or an owner's mobile is shared.
+    # Without the organisation number they also need every distinctive word of the legal name on the site.
+    if not ours_seen and res.proofs:
+        site_text = " ".join(f"{p.site_name} {p.title} {p.text}" for p in res.pages)
+        name_ok = _tokens_present([t for t in toks if t not in ("og", "i", "pa", "av")], site_text)
+        if not name_ok:
+            res.proofs = [p for p in res.proofs if p.kind not in ("phone", "email")]
+    # housing co-ops and section owners' associations: managers' sites look plausible, so only the number proves it
+    form = ((ent.get("organisasjonsform") or {}).get("kode") or "").upper()
+    if form in ("BRL", "ESEK", "BBL", "SAM") or fold(ent.get("navn", "")).startswith(("sameiet", "boligsameiet", "eierseksjonssameiet")):
+        if not ours_seen:
+            res.proofs = []
     res.other_orgnrs = sorted(others)
     if others and not ours_seen:
         # the site names a different legal entity as its operator

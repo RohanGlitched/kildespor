@@ -76,7 +76,7 @@ def add_website(p: Profile, res: SiteResult) -> None:
 
 def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     """Contact, social, description, locations and hiring links from a verified site."""
-    out = {"socials": [], "feeds": [], "job_links": [], "news_pages": []}
+    out = {"socials": [], "feeds": [], "job_links": [], "news_pages": [], "hints": _identity_hints(ent, res)}
     site_reg = registrable(res.home.host())
     reg_phones = {norm_phone(x) for x in (ent.get("telefon"), ent.get("mobil")) if x}
     # company-owned profiles: when a site links several profiles on one platform (client portfolios, partners,
@@ -86,10 +86,9 @@ def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
         for platform, url, handle in sp.socials(page):
             found.setdefault(platform, {}).setdefault(url.lower().rstrip("/"), (platform, url, handle, page))
     hints = _identity_hints(ent, res)
+    out["hints"] = hints
     for platform, items in found.items():
-        keep = list(items.items())
-        if len(keep) > 1:
-            keep = [(k, v) for k, v in keep if _resembles(v[2], hints)]
+        keep = [(k, v) for k, v in items.items() if _resembles(v[2], hints)]
         for key, (platform, url, handle, page) in keep[:2]:
             out["socials"].append((platform, url, handle))
             p.add(Claim("social", "company_profile", {"platform": platform, "url": url, "handle": handle},
@@ -170,6 +169,8 @@ def _jsonld_org(p: Profile, page: sp.Page, node: dict, out: dict) -> None:
             continue
         fake = sp.Page(url=page.url, final_url=page.final_url, links=[(s, "")])
         for platform, url, handle in sp.socials(fake):
+            if not _resembles(handle, out.get("hints", set())):
+                continue  # template leftovers: a sameAs that shares nothing with the company
             p.add(Claim("social", "company_profile", {"platform": platform, "url": url, "handle": handle},
                         [_ev(page, f"JSON-LD sameAs: {s}", "jsonld_sameAs")], label=f"{platform.title()} profile",
                         confidence=0.96, key=f"social:company_profile:{url.lower().rstrip('/')}"))

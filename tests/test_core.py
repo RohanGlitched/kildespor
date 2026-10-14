@@ -85,7 +85,7 @@ def test_verify_name_without_address_is_not_enough():
 
 def test_verify_phone_proof():
     res = SiteResult(Candidate("sandneselektriske.no", "name_derived"), "ambiguous", "",
-                     home=page("Ring oss på telefon 51 66 70 20", links=[("tel:+4751667020", "51 66 70 20")]))
+                     home=page("Sandnes Elektriske. Ring oss på telefon 51 66 70 20", links=[("tel:+4751667020", "51 66 70 20")]))
     res.pages = [res.home]
     out = verify(res, ENT, [], "810034882")
     assert out.status == "exact" and out.proofs[0].kind == "phone"
@@ -174,17 +174,41 @@ def test_role_holder_and_all_name_tokens():
     assert verify(other, ent, [], "999999999", []).status == "ambiguous"
 
 
-def test_housing_coop_needs_exact_name_and_town():
+def test_housing_coop_needs_its_own_number():
     ent = {"navn": "BREKKENE BORETTSLAG", "organisasjonsform": {"kode": "BRL"},
            "forretningsadresse": {"poststed": "BERGEN", "kommune": "BERGEN"}}
-    ok = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
-                    home=page("Brekkene Borettslag i Bergen", url="https://brekkene-borettslag.no/"))
-    ok.pages = [ok.home]
-    assert verify(ok, ent, [], "999999999").status == "exact"
-    wrong = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
-                       home=page("Brekkene Borettslag i Haugesund", url="https://brekkene-borettslag.no/"))
-    wrong.pages = [wrong.home]
-    assert verify(wrong, ent, [], "999999999").status == "ambiguous"
+    name_only = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
+                           home=page("Brekkene Borettslag i Bergen", url="https://brekkene-borettslag.no/"))
+    name_only.pages = [name_only.home]
+    assert verify(name_only, ent, [], "938702675").status == "ambiguous"
+    numbered = SiteResult(Candidate("brekkene-borettslag.no", "name_derived"), "ambiguous", "",
+                          home=page("Brekkene Borettslag, org.nr 938 702 675", url="https://brekkene-borettslag.no/"))
+    numbered.pages = [numbered.home]
+    assert verify(numbered, ent, [], "938702675").status == "exact"
+
+
+def test_phone_alone_needs_the_legal_name_on_the_site():
+    ent = {"navn": "KLAVENESS FINANS AS", "telefon": "23 11 00 00", "forretningsadresse": {}}
+    res = SiteResult(Candidate("klaveness.com", "registry_website"), "ambiguous", "",
+                     home=page("Klaveness group. Phone 23 11 00 00", url="https://www.klaveness.com/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "993345911").status == "ambiguous"
+
+
+def test_copyright_of_a_longer_sister_name_is_another_entity():
+    ent = {"navn": "NORRØN AS", "forretningsadresse": {"adresse": ["Gate 1"], "postnummer": "0150"}}
+    res = SiteResult(Candidate("norron.no", "name_derived"), "ambiguous", "",
+                     home=page("Norrøn\nGate 1, 0150 Oslo\n© 2026 Norrøn Bolig AS", url="https://norron.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "994916009").status == "other_entity"
+
+
+def test_labelled_number_failing_the_checksum_still_blocks_weak_proof():
+    ent = {"navn": "UNIVERSI AS", "forretningsadresse": {"adresse": ["Vei 2"], "postnummer": "0150"}}
+    res = SiteResult(Candidate("universi.no", "name_derived"), "ambiguous", "",
+                     home=page("Universi AS\nVei 2, 0150 Oslo\nOrg.nr. 932 953 520", url="https://universi.no/"))
+    res.pages = [res.home]
+    assert verify(res, ent, [], "984840551").status == "other_entity"
 
 
 def test_legal_form_is_case_sensitive_and_needs_the_town():
