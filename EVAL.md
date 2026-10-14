@@ -28,7 +28,8 @@ Brønnøysund entity, its roles and its registered workplaces.
 |---|---:|---:|---:|---:|---:|
 | d1000 | 174 | 147 | 3 | 13 | 2 |
 | d1000c | 167 | 102 (all without an org.nr proof) | 1 | 9 | 2 |
-| d1000d | see below | | | | |
+| d1000d | 154 | 83 (all 73 without an org.nr proof + 10) | 0 | 3 (two sister companies sharing an address, one sports club) | 0 |
+| d1000e | after the sibling-stem guard | see below | | | |
 
 In every audit, **every website proven by its own organisation number was correct**. Every bad match
 came from the weaker proofs, and each pattern became a rule and a regression test:
@@ -43,6 +44,8 @@ came from the weaker proofs, and each pattern became a rule and a regression tes
 | Housing co-ops managed by a company | skeiendom.no | co-ops and sameier need their own organisation number on the site |
 | Template, partner and portfolio links | linkedin.com/company/wix-com, a client's Instagram | a social handle must resemble the company's name, domain or brand |
 | Years, fax and foreign numbers read as phones | 20222021, +61 8 6559 6499 | Norwegian numbers only, from home/contact/about pages |
+| A sister company's site at the same address | avineering.com for Avineering Solutions AS (the site is AviNeering AS's) | when the site's brand stem is the exact registered name of another active entity, the site is withheld unless it shows our number |
+| "X er behandlingsansvarlig" | "Sædalen IL er behandlingsansvarlig" | operator lines are read in both word orders |
 
 ## Recall: what the withheld sites were
 

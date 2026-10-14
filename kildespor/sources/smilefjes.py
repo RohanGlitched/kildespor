@@ -16,6 +16,7 @@ GRADE = {"0": "smiling face (no remarks)", "1": "smiling face (minor remarks)", 
 
 
 class Smilefjes(Source):
+    late = True  # does not feed website discovery: runs after the research slot
     name = "smilefjes"
     families = ["activity", "locations"]
 

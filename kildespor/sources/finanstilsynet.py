@@ -16,6 +16,7 @@ PUBLIC = "https://www.finanstilsynet.no/virksomhetsregisteret/"
 
 
 class Finanstilsynet(Source):
+    late = True  # does not feed website discovery: runs after the research slot
     name = "finanstilsynet"
     families = ["identity", "activity"]
 

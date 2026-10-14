@@ -52,6 +52,14 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     p.notes["subunits"] = subunits
     p.notes["financial_years"] = years
 
+    # --- run-wide connectors start now and run alongside website discovery ----------------
+    async def connectors() -> None:
+        async def one(src) -> None:
+            await src.wait_ready()
+            await _enrich(ctx, src, p, ent, subunits, [])
+        await asyncio.gather(*(one(src) for src in ctx.sources if not src.late))
+    connector_task = asyncio.create_task(connectors())
+
     # --- website discovery and verification -------------------------------------------
     trace["t_registry_ms"] = int((time.monotonic() - t0) * 1000)
     cands = candidates(ent, subunits)
@@ -115,12 +123,12 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         p.checked_source(fam, "verified company website" if exact else "no verified website")
 
     trace["t_website_ms"] = int((time.monotonic() - t0) * 1000)
-    # --- run-wide connectors ------------------------------------------------------------
-    for src in ctx.sources:
-        if src.late:
-            continue
-        await src.wait_ready()
-        await _enrich(ctx, src, p, ent, subunits, exact)
+    trace["t_website_done_ms"] = int((time.monotonic() - t0) * 1000)
+    try:
+        await connector_task
+    except asyncio.CancelledError:
+        connector_task.cancel()
+        raise
     p.notes["late_args"] = (ent, subunits, exact, cands, orgnr)
     trace["runtime_ms"] = int((time.monotonic() - t0) * 1000)
     return p, trace
@@ -140,11 +148,10 @@ async def finish(ctx: Context, p: Profile, trace: dict) -> None:
     """Late sources (they wait for a run-wide index) and anything they unlock, after the research slot."""
     ent, subunits, exact, cands, orgnr = p.notes.pop("late_args")
     people = [c.value for c in p.family_claims("people") if c.field == "registered_role"]
-    for src in ctx.sources:
-        if not src.late:
-            continue
+    async def one(src) -> None:
         await src.wait_ready()
         await _enrich(ctx, src, p, ent, subunits, exact)
+    await asyncio.gather(*(one(src) for src in ctx.sources if src.late))
     # employer homepages stated in matched job ads are one more declared candidate
     if not exact and p.notes.get("nav_homepages"):
         extra = []

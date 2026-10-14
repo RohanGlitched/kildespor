@@ -30,6 +30,7 @@ def _text(v) -> str:
 
 
 class Ted(Source):
+    late = True  # does not feed website discovery: runs after the research slot
     name = "ted"
     families = ["activity"]
 

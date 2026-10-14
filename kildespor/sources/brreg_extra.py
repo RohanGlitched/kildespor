@@ -34,6 +34,7 @@ def _ev(f, span: str, method: str, url: str | None = None) -> list[Evidence]:
 
 
 class BrregExtra(Source):
+    late = True  # does not feed website discovery: runs after the research slot
     name = "brreg_extra"
     families = ["financials", "activity"]
 

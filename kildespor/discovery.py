@@ -165,7 +165,7 @@ class Resolver:
     (stale adapters are common) and public resolvers are kept as a fallback; if dnspython cannot
     answer at all, the operating system's resolver is used."""
 
-    def __init__(self, concurrency: int = 64) -> None:
+    def __init__(self, concurrency: int = 256) -> None:
         self.r = dns.asyncresolver.Resolver()
         self.r.lifetime = 3.0
         self.r.timeout = 1.5

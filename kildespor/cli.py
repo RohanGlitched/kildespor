@@ -279,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--expected-count", type=int)
     r.add_argument("--concurrency", type=int, default=96, help="HTTP requests in flight")
     r.add_argument("--companies-in-flight", type=int, default=96)
-    r.add_argument("--per-company-seconds", type=float, default=150)
+    r.add_argument("--per-company-seconds", type=float, default=240)
     r.add_argument("--budget-minutes", type=float, default=0, help="global time budget; 0 = none")
     r.add_argument("--snapshots", help="directory for raw response snapshots (default: next to --output)")
     r.add_argument("--no-snapshots", action="store_true")

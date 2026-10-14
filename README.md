@@ -4,7 +4,9 @@
 *Kildespor* is Norwegian for "source trail": every fact keeps the trail back to the record or page it came from.
 
 Give it a batch of organisation numbers. For each one it returns a profile built from the official
-registers, the company's own verified website, NAV's job feed and Wikidata, with the source URL,
+registers (Brønnøysund entity, roles, workplaces, accounts, update log, state aid), the company's own
+verified website, NAV's job feed, Mattilsynet inspections, EU procurement awards, Finanstilsynet and
+Arbeidstilsynet registers, customer ratings and Wikidata, with the source URL,
 retrieval time, content hash and exact text span behind every fact, an honest state for every
 field family it could not fill, and a diff against the previous run.
 
@@ -21,6 +23,7 @@ That writes:
 | `out/viewer/index.html` | a static viewer: search, filter, compare, open every source (works from disk) |
 | `out/snapshots.zip` | every response behind a published fact, one entry per SHA-256 |
 | `out/history/` | the previous run's envelopes after a refresh |
+| `out/.kildespor-cache/` | declared cache: NAV ad id → employer organisation number (an ad's employer never changes), so a refresh fetches only new ads |
 
 Running the same command again with the same output directory is a **refresh**: every fact is
 matched to the previous run by a stable key, changes are reported with evidence for both sides,

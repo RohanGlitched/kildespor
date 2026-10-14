@@ -24,6 +24,7 @@ def slug(value: str) -> str:
 
 
 class Fagfolkguiden(Source):
+    late = True  # does not feed website discovery: runs after the research slot
     name = "fagfolkguiden"
     families = ["reviews"]
 
