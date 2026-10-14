@@ -182,3 +182,6 @@ footer.foot { color: var(--ink-3); font-size: 12.5px; padding: 24px 0 0; border-
   .ev { animation: open .14s ease-out; }
   @keyframes open { from { opacity: 0; transform: translateY(-2px); } }
 }
+
+.cmpbar[hidden] { display: none; }
+[hidden] { display: none !important; }
