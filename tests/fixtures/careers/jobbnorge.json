@@ -1,0 +1,83 @@
+{
+ "jobs": [
+  {
+   "id": 310353,
+   "jobScope": "Deltid",
+   "jobDuration": "Fast",
+   "deadline": "Løpende",
+   "employer": "BPA Nord",
+   "employerID": 2823,
+   "title": "Trygg, tålmodig og omsorgsfull? Jeg søker BPA-assistent til dagvakter hver tredje helg",
+   "link": "https://www.jobbnorge.no/ledige-stillinger/stilling/310353",
+   "promoted": false,
+   "positionCount": 1,
+   "locations": [
+    {
+     "address": "Privat hjem",
+     "area": "Tomasjord",
+     "municipality": "Tromsø - Romsa",
+     "county": "Troms",
+     "isDomestic": true,
+     "isPrimary": true,
+     "zipCode": "9024"
+    }
+   ],
+   "publicationDate": "19.10.2026",
+   "jobType": {}
+  },
+  {
+   "id": 307395,
+   "jobScope": "Deltid",
+   "jobDuration": "Fast",
+   "deadline": "Løpende",
+   "employer": "BPA Nord",
+   "employerID": 2823,
+   "title": "13-årig gutt på Silsand søker trygge og omsorgsfulle assistenter",
+   "link": "https://www.jobbnorge.no/ledige-stillinger/stilling/307395",
+   "promoted": false,
+   "positionCount": 1,
+   "locations": [
+    {
+     "address": "Privat hjem",
+     "area": "Silsand",
+     "municipality": "Senja",
+     "county": "Troms",
+     "isDomestic": true,
+     "isPrimary": true,
+     "zipCode": "9303"
+    }
+   ],
+   "publicationDate": "13.10.2026",
+   "jobType": {}
+  },
+  {
+   "id": 310159,
+   "jobScope": "Deltid",
+   "jobDuration": "Fast",
+   "deadline": "05.11.2026",
+   "employer": "22.juli-senteret",
+   "employerID": 2161,
+   "regardDepartmentAsEmployer": false,
+   "department": "Avdeling for publikum, utstilling og samling (PUS)",
+   "departmentID": 61057,
+   "title": "Utstillingsverter",
+   "link": "https://www.jobbnorge.no/ledige-stillinger/stilling/310159",
+   "promoted": true,
+   "positionCount": 5,
+   "locations": [
+    {
+     "address": "Akersgata 42",
+     "area": "Oslo",
+     "municipality": "Oslo",
+     "county": "Oslo",
+     "isDomestic": true,
+     "isPrimary": true,
+     "zipCode": "0032"
+    }
+   ],
+   "publicationDate": "14.10.2026",
+   "jobType": {},
+   "jobRemoteWork": "Hjemmekontor ikke mulig"
+  }
+ ]
+}

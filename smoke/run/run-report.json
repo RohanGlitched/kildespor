@@ -1,9 +1,9 @@
 {
-  "run_id": "smoke-2026-10-14b",
+  "run_id": "kildespor-20261019T205550Z",
   "agent": "kildespor 0.1.0",
-  "started_at": "2026-10-14T15:26:20Z",
-  "completed_at": "2026-10-14T15:31:49Z",
-  "runtime_seconds": 329.8,
+  "started_at": "2026-10-19T20:55:50Z",
+  "completed_at": "2026-10-19T21:01:05Z",
+  "runtime_seconds": 311.7,
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -16,16 +16,16 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "claims": 6682,
-  "evidence_records": 6644,
+  "claims": 6575,
+  "evidence_records": 6557,
   "companies_with_claims_by_family": {
     "identity": 100,
     "financials": 100,
     "people": 100,
     "locations": 100,
-    "website": 9,
-    "contact": 36,
-    "social": 2,
+    "website": 13,
+    "contact": 39,
+    "social": 4,
     "jobs": 1,
     "activity": 100,
     "reviews": 0,
@@ -45,18 +45,18 @@
       "available": 100
     },
     "website": {
-      "blocked": 13,
-      "ambiguous": 41,
-      "not_available": 37,
-      "available": 9
+      "blocked": 1,
+      "ambiguous": 50,
+      "not_available": 36,
+      "available": 13
     },
     "contact": {
-      "available": 36,
-      "not_available": 64
+      "available": 39,
+      "not_available": 61
     },
     "social": {
-      "not_available": 98,
-      "available": 2
+      "not_available": 96,
+      "available": 4
     },
     "jobs": {
       "not_available": 99,
@@ -74,28 +74,29 @@
   },
   "changes": 0,
   "operations": {
-    "requests": 11519,
-    "bytes": 225623642,
+    "requests": 11248,
+    "bytes": 228895396,
     "by_source": {
-      "robots": 343,
+      "robots": 362,
       "ted": 1,
       "wikidata": 1,
-      "brreg": 408,
-      "regnskap": 172,
+      "brreg": 411,
       "nav_jobs": 1,
+      "regnskap": 164,
+      "ssb_klass": 1,
+      "nav_jobs_index": 9583,
       "arbeidstilsynet": 2,
       "smilefjes": 1,
-      "website": 369,
-      "fagfolkguiden": 109,
-      "stotteregisteret": 100,
+      "website": 414,
+      "fagfolkguiden": 101,
       "finanstilsynet": 100,
-      "nav_jobs_index": 9907,
-      "website_feed": 5
+      "stotteregisteret": 100,
+      "website_feed": 6
     },
-    "p50_company_ms": 61952,
-    "p95_company_ms": 92077,
+    "p50_company_ms": 73708,
+    "p95_company_ms": 95574,
     "third_party_cost_usd": 0.0,
-    "dns_timeouts": 6
+    "dns_timeouts": 9
   },
   "sources": [
     {
@@ -104,22 +105,22 @@
       "error": null,
       "prepare_seconds": 0.0,
       "companies_with_state_aid": 8,
-      "companies_with_account_copies": 71,
-      "account_copy_rate_limit_pauses": 1
+      "companies_with_account_copies": 56,
+      "account_copy_rate_limit_pauses": 8
     },
     {
       "name": "smilefjes",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 19.0,
-      "organisations_in_file": 8004,
+      "prepare_seconds": 17.9,
+      "organisations_in_file": 8005,
       "companies_matched": 1
     },
     {
       "name": "ted",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 2.2,
+      "prepare_seconds": 3.5,
       "queries": 1,
       "companies_with_awards": 1
     },
@@ -134,7 +135,7 @@
       "name": "arbeidstilsynet",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 12.0,
+      "prepare_seconds": 14.3,
       "companies_in_registers": 1,
       "matched": 1
     },
@@ -150,24 +151,41 @@
       "name": "nav_jobs",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 329.0,
-      "feed_pages": 157,
-      "ads_in_window": 43749,
-      "active_ads": 9739,
-      "detail_requests": 9750,
+      "prepare_seconds": 311.0,
+      "feed_pages": 155,
+      "ads_in_window": 42573,
+      "active_ads": 9419,
+      "detail_requests": 9428,
       "companies_matched": 0,
       "ads_published": 0,
       "window_days": 75,
-      "active_ads_indexed_by_orgnr": 9526,
+      "active_ads_indexed_by_orgnr": 9274,
       "index_cache_hits": 0,
       "index_complete": true,
       "walker_errors": []
     },
     {
+      "name": "careers",
+      "prepared": true,
+      "error": null,
+      "prepare_seconds": 0.0,
+      "companies_checked": 13,
+      "companies_with_targets": 0,
+      "targets_read": 0,
+      "companies_published": 0,
+      "postings_published": 0,
+      "skipped_other_employer": 0,
+      "skipped_duplicate": 0,
+      "skipped_expired": 0,
+      "skipped_abroad": 0,
+      "by_platform": {},
+      "not_read": {}
+    },
+    {
       "name": "wikidata",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 1.1,
+      "prepare_seconds": 2.3,
       "companies_with_items": 1,
       "matched": 1
     }

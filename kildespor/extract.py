@@ -66,12 +66,21 @@ def add_website(p: Profile, res: SiteResult) -> None:
     ev = [Evidence(pr.url, "company_owned" if pr.kind != "registry_declared" else "official_registry",
                    pr.retrieved_at, pr.sha256, f"{pr.kind}: {pr.detail}", "identity_proof_" + pr.kind,
                    source_name=urlsplit(pr.url).hostname or "") for pr in res.proofs]
-    value = {"url": home.final_url, "domain": registrable(home.host()), "title": clip(home.title, 160),
+    url, domain = home.final_url, registrable(home.host())
+    cand_domain = registrable(res.candidate.domain)
+    if domain != cand_domain and urlsplit(home.final_url).path.strip("/"):
+        # the company's own domain forwards to its page on another business's site (a chain's member profile,
+        # a directory entry): the website is the company's own domain, not the other site
+        url, domain = f"https://{res.candidate.domain.removeprefix('www.')}/", cand_domain
+        res.foreign_host = True  # its links and profiles belong to that other business
+    value = {"url": url, "domain": domain, "title": clip(home.title, 160),
              "discovered_via": res.candidate.origin, "identity_proof": sorted({pr.kind for pr in res.proofs})}
+    if url != home.final_url:
+        value["redirects_to"] = home.final_url
     if home.generator:
         value["generator"] = home.generator
     p.add(Claim("website", "official_website", value, ev, label="Official website", confidence=best.strength,
-                key=f"website:official_website:{registrable(home.host())}"))
+                key=f"website:official_website:{domain}"))
 
 
 def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
@@ -82,7 +91,7 @@ def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     # company-owned profiles: when a site links several profiles on one platform (client portfolios, partners,
     # template leftovers), keep only those whose handle resembles the company's name, domain or brand
     found: dict[str, dict[str, tuple]] = {}
-    for page in res.pages:
+    for page in ([] if getattr(res, "foreign_host", False) else res.pages):
         for platform, url, handle in sp.socials(page):
             found.setdefault(platform, {}).setdefault(url.lower().rstrip("/"), (platform, url, handle, page))
     hints = _identity_hints(ent, res)

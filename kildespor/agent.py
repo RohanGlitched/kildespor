@@ -10,10 +10,12 @@ from . import extract, registry
 from .claims import FAMILIES, Profile
 from .discovery import Candidate, Resolver, candidates, domain_of, registrable
 from .http import Client
-from .site import SiteResult, complete, crawl, sibling_check, verify
+from .site import SiteResult, complete, crawl, sibling_check, unique_name_check, verify
 
 MAX_NAME_CANDIDATES = 5
 MAX_EXACT_SITES = 2
+ORIGIN_RANK = {"registry_website": 0, "subunit_website": 1, "registry_email": 2, "subunit_email": 3, "wikidata_website": 4,
+               "job_ad_homepage": 5, "name_derived": 6}
 
 
 class Context:
@@ -87,13 +89,19 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
     exact: list[SiteResult] = []
     seen_domains: set[str] = set()
     for group in (declared, guessed):
-        results = await asyncio.gather(*(crawl(ctx.client, c) for c in group))
-        for res in results:
+        results = []
+        for res in await asyncio.gather(*(crawl(ctx.client, c) for c in group)):
             res = verify(res, ent, subunits, orgnr, people)
+            res = await unique_name_check(ctx.client, res, ent, orgnr, subunits, people)
             res = await sibling_check(ctx.client, res, ent, orgnr, subunits)
             trace["sites"].append({"domain": res.candidate.domain, "origin": res.candidate.origin, "status": res.status,
                                    "reason": res.reason, "final": res.home.final_url if res.home else None,
                                    "proofs": [pr.kind for pr in res.proofs]})
+            results.append(res)
+        # the main website is the best-proven one; on a tie, the site the entity declared in the register before
+        # Wikidata's (which may list a country site such as equinor.com.br) and before guessed domains
+        results.sort(key=lambda r: (r.status != "exact", -r.score, ORIGIN_RANK.get(r.candidate.origin, 5)))
+        for res in results:
             same_site = res.home and any(res.home.sha256 == x.home.sha256 or res.home.title == x.home.title for x in exact)
             # a second website is published only when it, too, shows the organisation number
             second_ok = not exact or any(pr.kind == "orgnr" for pr in res.proofs)
@@ -114,7 +122,9 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
             p.error("website_feed", repr(exc))
     if not exact:
         statuses = {s["status"] for s in trace["sites"]}
-        if "blocked" in statuses:
+        # only a site the entity declared makes the website "blocked"; a guessed domain that refuses crawlers
+        # says nothing about this company
+        if any(s["status"] == "blocked" and s["origin"] != "name_derived" for s in trace["sites"]):
             p.mark("website", "blocked", "A candidate site disallows automated access in robots.txt")
         elif "ambiguous" in statuses or "other_entity" in statuses:
             p.mark("website", "ambiguous", "Candidate sites were found but none proved it belongs to this exact entity")

@@ -65,6 +65,9 @@ class Evidence:
         return d
 
 
+URL_VALUED = {"official_website", "company_profile"}
+
+
 @dataclass
 class Claim:
     family: str
@@ -113,6 +116,10 @@ class Claim:
             d["reporting_period"] = self.reporting_period
         if self.attributes:
             d["attributes"] = self.attributes
+        if self.field in URL_VALUED and isinstance(self.value, dict) and self.value.get("url"):
+            # the output contract carries a website or profile as a plain URL; the structure stays in "details"
+            d["value"] = self.value["url"]
+            d["details"] = self.value
         return d
 
 

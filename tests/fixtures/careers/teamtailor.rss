@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations">
+  <channel>
+    <title>Pincho Nation Norway</title>
+    <description></description>
+    <link>https://pinchonationnorway.teamtailor.com/jobs</link>
+    <item>
+      <title>Hovmester til Pincho Nation Kristiansand!</title>
+      <description></description>
+      <pubDate>Wed, 30 Sep 2026 12:39:06 +0200</pubDate>
+      <link>https://pinchonationnorway.teamtailor.com/jobs/8478609-hovmester-til-pincho-nation-kristiansand</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>26de68aa-076e-4774-9df1-c2c9dd858e41</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Kristiansand</tt:name>
+          <tt:address>Markens gate 11</tt:address>
+          <tt:zip>4611</tt:zip>
+          <tt:city>Kristiansand</tt:city>
+          <tt:country>Norway</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Dining room</tt:department>
+      <tt:role>Hovmester</tt:role>
+    </item>
+    <item>
+      <title>Kjøkkenmedarbeider til Kristiansand</title>
+      <description></description>
+      <pubDate>Tue, 18 Aug 2026 12:34:01 +0200</pubDate>
+      <link>https://pinchonationnorway.teamtailor.com/jobs/8234718-kjokkenmedarbeider-til-kristiansand</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>bf547169-215c-45a4-a21a-f91b88893c82</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Kristiansand</tt:name>
+          <tt:address>Markens gate 11</tt:address>
+          <tt:zip>4611</tt:zip>
+          <tt:city>Kristiansand</tt:city>
+          <tt:country>Norway</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Kitchen</tt:department>
+      <tt:role>Kokk</tt:role>
+    </item>
+    <item>
+      <title>Kjøkkenmedarbeidere til Pincho Nation Fredrikstad</title>
+      <description></description>
+      <pubDate>Fri, 17 Jul 2026 19:12:28 +0200</pubDate>
+      <link>https://pinchonationnorway.teamtailor.com/jobs/8089315-kjokkenmedarbeidere-til-pincho-nation-fredrikstad</link>
+      <remoteStatus>none</remoteStatus>
+      <guid>e9f2014a-bde0-4068-8626-405fbfbba33d</guid>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Fredrikstad</tt:name>
+          <tt:address>Nygata 4</tt:address>
+          <tt:zip>1607</tt:zip>
+          <tt:city>Fredrikstad</tt:city>
+          <tt:country>Norway</tt:country>
+        </tt:location>
+      </tt:locations>
+      <tt:department>Kitchen</tt:department>
+      <tt:role>Kokk</tt:role>
+    </item>
+  </channel>
+</rss>

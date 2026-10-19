@@ -62,6 +62,9 @@ def default_sources(args: argparse.Namespace) -> list[Source]:
     if not getattr(args, "no_jobs", False):
         from .nav_jobs import NavJobs
         out.append(NavJobs())
+    if not getattr(args, "no_careers", False):
+        from .careers import Careers
+        out.append(Careers())
     if not getattr(args, "no_wikidata", False):
         from .wikidata import Wikidata
         out.append(Wikidata())

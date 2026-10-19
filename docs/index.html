@@ -2,39 +2,95 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kildespor</title>
 <meta name="description" content="Norwegian company profiles where every fact links to its source.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3f4f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1318" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23173f63'/%3E%3Cpath d='M8 23 L15 16 L20 19 L25 9' stroke='%23fff' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='25' cy='9' r='3' fill='%23f6d55c'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem("ks-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-view="home">
+<a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <a class="brand" href="#/"><b>Kildespor</b><span>Norwegian company research, every fact sourced</span></a>
-  <div class="run" id="runlabel"></div>
+  <a class="brand" href="#/" aria-label="Kildespor, all companies">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6"/><path d="M8 23 L15 16 L20 19 L25 9"/><circle cx="25" cy="9" r="3"/></svg>
+    <span class="bn">Kildespor</span><span class="bt">Norwegian company research, every fact sourced</span>
+  </a>
+  <nav class="topnav" aria-label="Views">
+    <a href="#/" class="tn-list" data-nav="list">Companies</a>
+    <a href="#/run" data-nav="run"><span class="lg">Run o</span><span class="sm-o">O</span>verview</a>
+  </nav>
+  <button class="iconbtn theme" id="theme" type="button" aria-label="Switch colour theme" title="Switch light / dark">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="sun" d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
+  </button>
 </header>
 <div class="app" id="app">
-  <aside class="list" aria-label="Companies">
+  <aside class="list" id="list" aria-label="Find companies">
     <div class="controls">
-      <label class="sr" for="q">Search companies</label>
-      <input id="q" class="search" type="search" placeholder="Search name, org.nr, place, website  ( / )" autocomplete="off">
-      <div class="filters" role="group" aria-label="Filters">
-        <button class="chip" data-f="site" aria-pressed="false">Verified website</button>
-        <button class="chip" data-f="social" aria-pressed="false">Profiles</button>
-        <button class="chip" data-f="jobs" aria-pressed="false">Hiring</button>
-        <button class="chip" data-f="changed" aria-pressed="false">Changed</button>
+      <div class="searchwrap">
+        <label class="sr" for="q">Search companies</label>
+        <svg class="sicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+        <input id="q" class="search" type="search" placeholder="Name, org.nr, website, place, industry" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <kbd class="kbd" aria-hidden="true">/</kbd>
       </div>
-      <div class="listmeta"><span id="count"></span>
-        <label>Sort <select id="sort"><option value="evidence">Most facts</option><option value="name">Name A–Å</option><option value="revenue">Revenue</option><option value="changes">Changes</option></select></label>
+      <div class="filters" role="group" aria-label="Quick filters">
+        <button type="button" class="chip" data-f="site" aria-pressed="false">Verified site</button>
+        <button type="button" class="chip" data-f="jobs" aria-pressed="false">Hiring now</button>
+        <button type="button" class="chip" data-f="social" aria-pressed="false">Profiles</button>
+        <button type="button" class="chip" data-f="changed" aria-pressed="false">Changed</button>
+      </div>
+      <details class="more" id="morefilters">
+        <summary>Filter by availability state <span class="mf-on" id="mfon"></span></summary>
+        <div class="mf">
+          <label>Information type<select id="ffam"></select></label>
+          <label>State<select id="fst"></select></label>
+        </div>
+      </details>
+      <div class="listmeta">
+        <span id="count" aria-live="polite"></span>
+        <button type="button" class="linkbtn" id="reset" hidden>Reset</button>
+        <label class="sortl">Sort
+          <select id="sort">
+            <option value="facts">Most facts</option>
+            <option value="revenue">Revenue</option>
+            <option value="result">Annual result</option>
+            <option value="name">Name A–Å</option>
+            <option value="recent">Recent activity</option>
+            <option value="changes">Changes</option>
+          </select>
+        </label>
       </div>
     </div>
-    <div class="rows" id="rows"></div>
-    <div class="cmpbar" id="cmpbar" hidden><span id="cmpn"></span><span><button class="clear" id="cmpclear">Clear</button> <button id="cmpgo">Compare</button></span></div>
+    <ul class="rows" id="rows" aria-label="Companies"></ul>
   </aside>
   <main class="main" id="main" tabindex="-1"></main>
 </div>
+<div class="tray" id="tray" hidden>
+  <div class="tray-in">
+    <span class="tray-l">Compare</span>
+    <ul class="tray-items" id="trayitems"></ul>
+    <div class="tray-act">
+      <button type="button" class="linkbtn inv" id="trayclear">Clear</button>
+      <a class="btn inv" id="traygo" href="#/">Compare</a>
+    </div>
+  </div>
+</div>
+<div class="drawer" id="drawer" hidden>
+  <div class="scrim" data-close></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dtitle" tabindex="-1">
+    <div class="dhead">
+      <div><div class="eyebrow" id="deyebrow">Evidence</div><h2 id="dtitle">Evidence</h2></div>
+      <button type="button" class="iconbtn" data-close aria-label="Close evidence">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="dbody" id="dbody"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="data/index.js"></script>
 <script src="app.js"></script>
 </body>

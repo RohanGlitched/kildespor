@@ -41,12 +41,14 @@ envelopes, run report, the evidence archive and the `verify` report.
 | | Smoke test (100) | Development run (1,000) |
 |---|---:|---:|
 | Envelopes / validation | 100 / passed | 1000 / passed |
-| Facts | 6,682 | 63,909 |
-| Evidence records, hash found in archive | 6,644, all | 63,532 |
-| Runtime from a cold start | 5.5 min | 8.2 min ¹ |
+| Facts | 6,575 | 63,654 |
+| Evidence records, hash found in archive | 6,557, all | 63,291 |
+| Quoted page spans found in the archived page | 148 of 148 | |
+| Runtime from a cold start (home connection) | 5.2 min | 8.6 min ¹ |
 | Third-party cost | $0 | $0 |
 
-¹ On that run NAV's feed could not be reached because of a local DNS fault (since fixed by the resolver fallback); the job index builds in parallel with the research, so it adds little when it runs.
+¹ NAV's job index builds in parallel with the research and is capped at 7 minutes; on a home connection it indexes
+about 5,400 of NAV's ~9,400 active ads in that time.
 
 Companies with at least one verified fact, by field family:
 
@@ -56,23 +58,24 @@ Companies with at least one verified fact, by field family:
 | Annual accounts and history | 100 / 100 | 999 / 1,000 |
 | Leadership and board | 100 / 100 | 999 / 1,000 |
 | Workplaces and addresses | 100 / 100 | 1000 / 1,000 |
-| Verified official website | 9 / 100 | 139 / 1,000 |
-| Company-published contact details | 36 / 100 | 437 / 1,000 |
-| Company-owned profiles | 2 / 100 | 85 / 1,000 |
-| Hiring | 1 / 100 | 21 / 1,000 |
+| Verified official website | 13 / 100 | 149 / 1,000 |
+| Company-published contact details | 39 / 100 | 445 / 1,000 |
+| Company-owned profiles | 4 / 100 | 89 / 1,000 |
+| Hiring | 1 / 100 | 27 / 1,000 |
 | Dated public activity | 100 / 100 | 1000 / 1,000 |
 | Customer ratings | 0 / 100 | 21 / 1,000 |
 | What the company does | 100 / 100 | 1000 / 1,000 |
 
 A random company from the register is usually a small holding or property company with no website,
-so the share with a website or profiles reflects the population, not a crawl limit. On the
-1,000-company run, websites verified by Kildespor reach **139** companies; the register lists a website for
-about 9% of them.
+so the share with a website or profiles reflects the population, not a crawl limit. In a hand-labelled
+sample of 80 random companies for which no website was published, two independent searches found only
+about 10 with a live site of their own ([eval/website-truth-80.jsonl](eval/website-truth-80.jsonl)).
 
-**Precision.** Independent audits of the 1,000-company run re-fetched every website not proven
-by its organisation number: wrong-company websites went from 16 to 10 to 3 to **0 of 70** in the final audit, and every
-site proven by its own organisation number was correct in every audit. What each audit found and the rule it
-produced: [EVAL.md](EVAL.md).
+**Precision.** Independent audits re-fetched every website not proven by its organisation number:
+wrong-company websites went from 16 to 10 to 3 to **0 of 70** across the version-1 audits, and every site
+proven by its own organisation number was correct in every audit. The October 20 rules were audited the same
+way (36 newly published sites): the 3 wrong matches the first audit found became rules and tests, and the
+second audit found **0 wrong**. What each audit found and the rule it produced: [EVAL.md](EVAL.md).
 
 ## Check the evidence yourself
 
@@ -108,14 +111,22 @@ The input may be JSONL (`{"organisation_number": "…"}` per line), a JSON array
 3. **Prove it.** A site is published only when it shows the organisation number, the registered
    phone or e-mail, the legal name with the registered street address, the exact legal name with its
    legal form and the registered town, or a current role holder together with the full legal name.
-   A site that prints a different organisation number, or whose copyright or data-controller line
-   names another company, is rejected. A website declared in the register is a candidate, never proof
-   on its own. Details: [IDENTITY_RESOLUTION.md](IDENTITY_RESOLUTION.md).
+   Narrower name proofs cover the rest: a site the entity declared that names it in full on its home
+   page; a domain spelling the whole name with the registered town on the site; a `.no` domain spelling
+   a name that no other entity in the register carries. A site that prints a different organisation number,
+   whose copyright or data-controller line names another company, that is placed in another town, or whose
+   brand is the registered name of a sister company is rejected. Sites drawn in JavaScript are read from
+   their page data and script bundles. Details: [IDENTITY_RESOLUTION.md](IDENTITY_RESOLUTION.md).
 4. **Read the proven site** for company-owned profiles, contact details, addresses, careers pages,
    recruitment platforms, JobPosting data and dated news (RSS/Atom, JSON-LD, news listings).
 5. **Hiring.** Every active ad in NAV's job feed is indexed by its employer organisation number;
-   an ad is published when that number is the company's or one of its registered workplaces'.
-6. **Summarise** in short sentences that each cite the facts they rest on, and list what is unknown.
+   an ad is published when that number is the company's or one of its registered workplaces'. The
+   recruitment platforms the proven site links (Teamtailor, Recman, ReachMee, Jobylon, Jobbnorge,
+   Easycruit, or the site's own careers page) add postings whose employer is the company itself.
+6. **Summarise** what kind of company it is in plain English, then sourced conclusions with their
+   formula (revenue trend, operating margin, equity ratio, cash against debt, a turn to profit or loss,
+   register warnings, register events in the last 12 months), and why each unknown is unknown. Every
+   sentence cites the facts it rests on.
 
 Sources and their terms: [SOURCES.md](SOURCES.md).
 

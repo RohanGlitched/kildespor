@@ -29,6 +29,14 @@ MATERIAL = {"people": "high", "financials": "high", "website": "high", "identity
 VOLATILE_FAMILIES = {"activity"}  # old news falling off a feed is not a removal
 
 
+def _comparable(c: dict):
+    """A website or profile is compared by its URL (older runs stored the whole structure as the value)."""
+    v = c.get("value")
+    if isinstance(v, dict) and v.get("url") and c.get("field") in ("official_website", "company_profile"):
+        return v["url"]
+    return v
+
+
 def _canon(v: Any) -> str:
     return json.dumps(v, ensure_ascii=False, sort_keys=True)
 
@@ -73,7 +81,7 @@ def diff(current: dict, previous: dict | None) -> dict:
             continue
         c["first_observed"] = old.get("first_observed") or previous["run"]["completed_at"]
         c["last_observed"] = now
-        if _canon(old["value"]) != _canon(c["value"]):
+        if _canon(_comparable(old)) != _canon(_comparable(c)):
             events.append({"type": TYPED.get((c["family"], "changed"), "changed"), "change": "changed", "family": c["family"],
                            "field": c["field"], "key": c["key"], "materiality": MATERIAL.get(c["family"], "low"),
                            "previous": old["value"], "current": c["value"],

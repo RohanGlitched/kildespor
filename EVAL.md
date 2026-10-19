@@ -53,6 +53,54 @@ The final audit (d1000h) also checked every customer rating (21/21 correct: the 
 organisation number), 15 state-aid awards (15/15) and 10 food inspections (10/10), and all 81 e-mail
 addresses it looked at (81/81).
 
+## October 20: recall pass with ground truth, then an audit of every new website
+
+**Ground truth.** On 300 random companies from the public universe, version 1 published 42 websites. For
+80 of the 258 companies without one, two independent labelling agents each searched the web and the
+register by hand (`runs/label80-truth.*.jsonl`, kept outside the repository). About 10 of the 80 have a
+live site of their own; the rest have none (holding, property and dormant companies), only a parent's,
+manager's or chain's site, or a dead or robots-blocked one. The website ceiling in a random batch is low,
+so every rule below targets a pattern seen in those labels:
+
+| Missed pattern | Example | New rule |
+|---|---|---|
+| a declared site naming the entity in full, without a number | norskartist.no | `registry_declared_name` |
+| a full-name domain on a site that also states the town | nesbruklinikken.no, driftstorget.no | `name_domain_town` |
+| a full-name `.no` domain whose name nobody else in the register carries | beautyhudstudio.no | `unique_name_domain` |
+| street and house number without the postcode | "Torpebaugen 4" on norsktrafoservice.com | `name_street` |
+| org.nr only inside a React bundle | zenergi.no | page data and same-host bundles read as pages |
+| page words read as a sister company's brand | "Hjem - Driftstorget" → "HJEM AS" | page words skipped |
+| a namesake in another town blocked a site printing our exact legal name | okkenhaug.no vs the Oslo sole trader "Okkenhaug" | namesakes in other municipalities ignored |
+| a Wikidata country site chosen over the registered one | equinor.com.br over equinor.com | best proof first, then register before Wikidata |
+
+**Result on the same 300:** 42 → 54 websites. **On 271 fresh companies (holdout):** 39 → 47.
+
+**Audit.** A separate agent re-checked every one of the 20 newly published websites against the register,
+roles and same-name entities: 16 correct, 1 right company on the wrong URL, **3 wrong entity**. Each became
+a rule and a test, and a live re-probe of all 20 with the fixed rules publishes none of the 3 and keeps all 16:
+
+| Wrong | Why it passed | Rule now |
+|---|---|---|
+| kriss-consulting.com, "Kriss Consulting Inc" (US) for a carpenter in Kristiansand | the site answered our Norwegian Accept-Language with `lang="no"` | `unique_name_domain` only on `.no`; a foreign company form (Inc, Ltd, GmbH…) in a title refuses every name proof |
+| dekkhuset.no (DEKKHUSET AS, Alversund) for DEKK HUSET AS (Oppaker) | the register search used the spaced name | the name is searched both spaced and squashed; name-only proofs are refused when the site is placed in another town |
+| a Wix site of the sole trader "ENK Stian Sæther" for STIAN SÆTHER AS | a company named after its owner: the owner's name proves nothing | role-holder proof off for person-named companies; free-hosting subdomains need a number, phone or e-mail |
+| rorkjop.no member page for ZM RØR AS (right company) | its domain forwards to a chain's profile page | the company's own domain is published; the other site's links are not used |
+
+**Second audit (1,000-company development set).** With all rules in place the 1,000-company run published
+149 websites against 136 in the last audited version-1 run (runtime 8.6 min against 8.2). The 16 new sites that
+rest on name-based or single-contact proofs went to a fresh independent audit: 13 correct, 2 acceptable (the
+Norwegian operating company's brand site; NGI's site shared by the AS and its foundation), 1 uncertain, **0
+wrong entity**. The uncertain one (solcellegrossisten.no, a webshop showing only a brand name and a free-mail
+address, offered for sale by a private person) led to one more rule: `unique_name_domain` also needs something
+on the site that ties it to this company — a registered role holder, the registered phone or e-mail, or the
+registered street or postcode. Role holders now match when the site drops a middle name or writes a
+hyphenated surname ("Andreas Greve-Isdahl" for Andreas Alnæs Greve-Isdahl).
+
+Two run-time bugs were found the same way and fixed before release: a retry meant for HTTP 429 also retried
+timeouts, which doubled every unreachable host's wait and pushed many sites past their 60-second budget (280
+timeouts on 1,000 companies, against 14 after the fix); and script bundles are now read only for pages with almost
+no HTML text, at most two per site, 1.2 MB each, six at a time across the run.
+
 ## Recall: what the withheld sites were
 
 A separate agent labelled 70 companies whose candidate sites had been withheld as ambiguous: 6 really

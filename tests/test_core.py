@@ -167,7 +167,9 @@ def test_role_holder_and_all_name_tokens():
     res = SiteResult(Candidate("christianmeaassvendsen.no", "name_derived"), "ambiguous", "",
                      home=page("Christian Meaas Svendsen – fotograf", url="https://christianmeaassvendsen.no/"))
     res.pages = [res.home]
-    assert verify(res, ent, [], "999999999", people).status == "exact"
+    # a company named after its owner: the owner's name proves nothing (the register search in
+    # unique_name_check decides whether the full-name domain is unambiguous)
+    assert verify(res, ent, [], "999999999", people).status == "ambiguous"
     other = SiteResult(Candidate("svendsen.no", "name_derived"), "ambiguous", "",
                        home=page("Christian Meaas Svendsen", url="https://svendsen.no/"))
     other.pages = [other.home]
@@ -266,3 +268,91 @@ def test_resolver_fallback_accepts_idna_bytes(monkeypatch):
     monkeypatch.setattr(netfix, "_public", lambda name: ["34.128.161.34"] if name == "example.no" else [])
     assert netfix.getaddrinfo(b"example.no", 443)[0][4][0] == "34.128.161.34"
     assert netfix.getaddrinfo("example.no", 443)[0][4][0] == "34.128.161.34"
+
+
+def _declared(domain, home, origin="registry_website"):
+    res = SiteResult(Candidate(domain, origin, "www." + domain), "ambiguous", "", home=home)
+    res.pages = [home]
+    return res
+
+
+def test_declared_site_with_the_whole_legal_name_in_its_title():
+    home = page("Velkommen til oss. Vi leverer elektro i hele Jæren. " * 8, url="https://sandneselektriske.no/",
+                title="Sandnes Elektriske – elektriker i Sandnes")
+    res = verify(_declared("sandneselektriske.no", home), ENT, [], "810034882")
+    assert res.status == "exact" and [p.kind for p in res.proofs] == ["registry_declared_name"]
+
+
+def test_declared_site_missing_a_name_word_stays_ambiguous():
+    home = page("Velkommen til oss. " * 30, url="https://sandnes.no/", title="Sandnes – elektriker")
+    assert verify(_declared("sandnes.no", home), ENT, [], "810034882").status == "ambiguous"
+
+
+def test_guessed_domain_never_gets_the_declared_name_proof():
+    home = page("Velkommen til oss. " * 30, url="https://sandneselektriske.no/", title="Sandnes Elektriske")
+    res = verify(_declared("sandneselektriske.no", home, origin="name_derived"), ENT, [], "810034882")
+    assert res.status == "ambiguous"
+
+
+def test_declared_site_naming_another_operator_is_rejected():
+    home = page("Nettstedet driftes av Bate Boligbyggelag AS, org.nr 948 646 233. " * 5, url="https://sandneselektriske.no/",
+                title="Sandnes Elektriske")
+    assert verify(_declared("sandneselektriske.no", home), ENT, [], "810034882").status == "other_entity"
+
+
+def test_declared_one_word_name_needs_five_letters_and_content():
+    ent = {"navn": "KITRON ASA", "forretningsadresse": {}}
+    thin = page("Kitron", url="https://kitron.com/", title="Kitron")
+    rich = page("Kitron is an electronics manufacturing services company. " * 10, url="https://kitron.com/", title="Kitron")
+    assert verify(_declared("kitron.com", thin), ent, [], "976605713").status == "ambiguous"
+    assert verify(_declared("kitron.com", rich), ent, [], "976605713").status == "exact"
+
+
+ROPP = {"navn": "ROPPESTADKOLLEN AS", "forretningsadresse": {"adresse": ["Roppestadveien 3"], "postnummer": "3133", "poststed": "DUKEN", "kommune": "FÆRDER"}}
+
+
+def test_guessed_domain_spelling_the_whole_name_with_the_town():
+    home = page("Velkommen til Roppestadkollen. Leiligheter på Duken, Nøtterøy. " * 6, url="https://roppestadkollen.no/",
+                title="Roppestadkollen")
+    res = verify(_declared("roppestadkollen.no", home, origin="name_derived"), ROPP, [], "921027605")
+    assert res.status == "exact" and [p.kind for p in res.proofs] == ["name_domain_town"]
+
+
+def test_guessed_full_name_domain_in_another_town_stays_ambiguous():
+    home = page("Velkommen til Roppestadkollen i Bergen. " * 8, url="https://roppestadkollen.no/", title="Roppestadkollen")
+    assert verify(_declared("roppestadkollen.no", home, origin="name_derived"), ROPP, [], "921027605").status == "ambiguous"
+
+
+def test_guessed_partial_name_domain_is_not_enough():
+    ent = {"navn": "ANORD INVEST AS", "forretningsadresse": {"postnummer": "0150", "poststed": "OSLO", "kommune": "OSLO"}}
+    home = page("Anord in Oslo. " * 20, url="https://anord.no/", title="Anord")
+    assert verify(_declared("anord.no", home, origin="name_derived"), ent, [], "915750818").status == "ambiguous"
+
+
+def test_page_words_in_titles_are_not_brands():
+    from kildespor.site import PAGE_WORDS
+    assert "hjem" in PAGE_WORDS and "forside" in PAGE_WORDS
+
+
+def test_foreign_company_title_is_not_our_name():
+    ent = {"navn": "KRISS CONSULTING AS", "forretningsadresse": {"postnummer": "4624", "poststed": "KRISTIANSAND S", "kommune": "KRISTIANSAND"}}
+    home = page("We are consultants in Kristiansand. " * 20, url="https://kriss-consulting.no/", title="Kriss Consulting Inc")
+    assert verify(_declared("kriss-consulting.no", home, origin="name_derived"), ent, [], "826756152").status == "ambiguous"
+
+
+def test_site_placed_in_another_town_refuses_name_only_proof():
+    ent = {"navn": "DEKK HUSET AS", "forretningsadresse": {"postnummer": "2166", "poststed": "OPPAKER", "kommune": "NES"}}
+    people = [{"kind": "person", "name": "Arild Aarnes"}]
+    home = page("Dekk Huset ved Arild Aarnes. Blombakken 4, 5911 Alversund. " * 6, url="https://dekkhuset.no/", title="Dekk Huset")
+    res = verify(_declared("dekkhuset.no", home, origin="name_derived"), ent, [], "919654406", people)
+    assert res.status == "ambiguous" and "5911 Alversund" in res.reason
+    home2 = page("Dekk Huset ved Arild Aarnes. Storveien 1, 2166 Oppaker. " * 6, url="https://dekkhuset.no/", title="Dekk Huset")
+    assert verify(_declared("dekkhuset.no", home2, origin="name_derived"), ent, [], "919654406", people).status == "exact"
+
+
+def test_company_named_after_its_owner_needs_more_than_the_owner_name():
+    ent = {"navn": "STIAN SÆTHER AS", "forretningsadresse": {}}
+    home = page("Tredesign av Stian Sæther. Kontakt Stian Sæther for tilbud. " * 6, url="https://stiansether.no/", title="Stian Sæther")
+    people = [{"kind": "person", "name": "Stian Sæther"}]
+    res = verify(_declared("stiansether.no", home, origin="name_derived"), ent, [], "817447902", people)
+    assert res.status == "ambiguous"

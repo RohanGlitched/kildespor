@@ -13,12 +13,12 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__
+from . import __version__, synthesis
 from .agent import Context, finish, research
 from .claims import FAMILIES, Profile
 from .discovery import Resolver
 from .envelope import build
-from .http import Client
+from .http import COMPANY_REQUESTS, Client
 from .refresh import diff, load_previous
 from .sources import default_sources
 from .util import utc_now
@@ -146,6 +146,7 @@ async def run(args: argparse.Namespace) -> int:
     ctx.cache_dir = out.parent / ".kildespor-cache"  # declared external cache: NAV ad -> employer organisation number
     for src in ctx.sources:
         src.start(ctx, orgs)  # all run-wide downloads and indexes build in the background
+    nace_task = asyncio.create_task(synthesis.load_industry_names(client))  # English industry names, one request
     deadline = t0 + args.budget_minutes * 60 if args.budget_minutes else None
     sem = asyncio.Semaphore(args.companies_in_flight)
     results: dict[str, dict] = {}
@@ -155,7 +156,8 @@ async def run(args: argparse.Namespace) -> int:
     async def one(org: str) -> None:
         nonlocal done
         async with sem:
-            req0 = client.stats.requests
+            tally = [0]
+            COMPANY_REQUESTS.set(tally)  # this task and the tasks it starts count into this company's tally
             c0 = time.monotonic()
             p = Profile(org)
             trace: dict = {}
@@ -185,8 +187,12 @@ async def run(args: argparse.Namespace) -> int:
                     p.mark("jobs", "failed", "the job index was not ready within the time budget")
             except Exception as exc:
                 p.error("runner", repr(exc))
-        ops = {"requests": client.stats.requests - req0, "runtime_ms": research_ms,
+        ops = {"requests": tally[0], "runtime_ms": research_ms,
                "third_party_cost_usd": 0.0}
+        try:
+            await asyncio.wait_for(asyncio.shield(nace_task), 20)
+        except Exception:  # English industry names are a nicety: never hold up a profile
+            pass
         env = build(p, run_id=run_id, started_at=started, completed_at=utc_now(), operations=ops, changes=None,
                     trace=trace if args.trace else None)
         ch = diff(env, previous.get(org))
@@ -286,6 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--html", help="write the static profile viewer to this directory")
     r.add_argument("--trace", action="store_true", help="include the discovery trace in each envelope")
     r.add_argument("--no-jobs", action="store_true")
+    r.add_argument("--no-careers", action="store_true", help="skip job postings on recruitment pages the verified site links")
     r.add_argument("--no-wikidata", action="store_true")
     r.add_argument("--no-announcements", action="store_true")
     v = sub.add_parser("view", help="build the static viewer from an envelopes file")

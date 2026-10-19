@@ -70,7 +70,7 @@
 | `website` | the verified official website with its proofs |
 | `contact` | registered phone, mobile and e-mail; e-mail and phone on the verified site |
 | `social` | company-owned profiles (Facebook, Instagram, LinkedIn, YouTube, X, TikTok, …) |
-| `jobs` | job postings (NAV, site JobPosting), careers pages, linked recruitment platforms |
+| `jobs` | job postings (NAV, site JobPosting, postings on recruitment platforms the verified site links: Teamtailor, Recman, ReachMee, Jobylon, Jobbnorge, Easycruit, …), careers pages, linked recruitment platforms |
 | `activity` | dated items: company news (feed, JSON-LD, news page), job ads published |
 | `description` | the registered purpose, the site's own description |
 

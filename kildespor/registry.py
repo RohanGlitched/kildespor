@@ -91,7 +91,8 @@ async def add_registry(client: Client, p: Profile, ent: dict, f: Fetched) -> Non
                     [_ev(f, "vedtektsfestetFormaal: " + purpose, "registry_field")], label="Registered purpose"))
     flags = []
     for key, label in (("registrertIMvaregisteret", "VAT registered"), ("registrertIForetaksregisteret", "In the Register of Business Enterprises"),
-                       ("erIKonsern", "Part of a group"), ("konkurs", "Bankrupt"), ("underAvvikling", "Being wound up")):
+                       ("erIKonsern", "Part of a group"), ("konkurs", "Bankrupt"), ("underAvvikling", "Being wound up"),
+                       ("underTvangsavviklingEllerTvangsopplosning", "Under forced dissolution")):
         if ent.get(key):
             flags.append(label)
     if flags:

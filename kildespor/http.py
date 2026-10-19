@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import zipfile
 import gzip
 import ipaddress
@@ -61,6 +62,9 @@ class Fetched:
             return self.body.decode("utf-8", errors="replace")
 
 
+COMPANY_REQUESTS: contextvars.ContextVar[list | None] = contextvars.ContextVar("company_requests", default=None)
+
+
 class Stats:
     def __init__(self) -> None:
         self.requests = 0
@@ -70,6 +74,9 @@ class Stats:
 
     def add(self, source: str, f: Fetched) -> None:
         self.requests += 1
+        tally = COMPANY_REQUESTS.get()
+        if tally is not None:  # requests made on behalf of one company (its tasks inherit the context)
+            tally[0] += 1
         self.bytes += len(f.body)
         self.latencies.append(f.elapsed_ms)
         self.by_source[source] = self.by_source.get(source, 0) + 1
@@ -145,7 +152,7 @@ class Client:
                 rp: urllib.robotparser.RobotFileParser | None = urllib.robotparser.RobotFileParser()
                 f = await self._raw("robots", origin + "/robots.txt", max_body=500_000, check_robots=False)
                 if f.ok and "text" in (f.content_type or "text/plain"):
-                    rp.parse(f.text().splitlines())
+                    rp.parse(f.text().lstrip("﻿").splitlines())  # a BOM would hide the first User-agent line
                 elif f.status in (401, 403):
                     rp.parse(["User-agent: *", "Disallow: /"])
                 else:

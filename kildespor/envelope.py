@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import synthesis
 from .claims import FAMILIES, Claim, Profile
 
 SECTIONS = [
@@ -64,6 +65,9 @@ def summarise(p: Profile) -> dict[str, Any]:
     if founded:
         parts.append(f"(founded {str(founded.value)[:4]})")
     s.append({"topic": "identity", "text": " ".join(parts) + ".", "claim_keys": keys})
+    prof = synthesis.profile_line(p)
+    if prof:
+        s.append(prof)
     if brand and name and brand.value.lower() not in name.value.lower():
         s.append({"topic": "identity", "text": f"It presents itself online as {brand.value}.", "claim_keys": [brand.key]})
     desc = _first(by["description"], "site_description") or _first(by["description"], "about_page")
@@ -96,8 +100,9 @@ def summarise(p: Profile) -> dict[str, Any]:
             ks.append(eq.key)
         if bits:
             s.append({"topic": "financials", "text": f"Latest filed accounts ({y}): " + ", ".join(bits) + ".", "claim_keys": ks})
-        if eq and eq.value["amount"] is not None and eq.value["amount"] < 0:
-            s.append({"topic": "financials", "text": f"Equity was negative at the end of {y}.", "claim_keys": [eq.key]})
+    concl = synthesis.conclusions(p)
+    s.extend(x for x in concl if x["topic"] == "risk")
+    s.extend(x for x in concl if x["topic"] == "assessment")
     roles = sorted([c for c in by["people"] if c.field == "registered_role"],
                    key=lambda c: ROLE_ORDER.index(c.value.get("role_code")) if c.value.get("role_code") in ROLE_ORDER else 99)
     lead = [c for c in roles if c.value.get("role_code") in ("DAGL", "LEDE", "INNH")][:2]
@@ -134,11 +139,12 @@ def summarise(p: Profile) -> dict[str, Any]:
         top = acts[0]
         title = top.value.get("title") or top.label if isinstance(top.value, dict) else top.label
         s.append({"topic": "activity", "text": f"Most recent dated activity ({top.effective_date}): {title}.", "claim_keys": [top.key]})
+    s.extend(x for x in concl if x["topic"] == "recent_changes")
     unknown = [f for f in FAMILIES if not by[f]]
     headline = (name.value if name else p.orgnr)
     if ind:
         headline += f" · {ind.value.split(' ', 1)[-1]}"
-    return {"headline": headline, "sentences": s, "unknowns": unknown}
+    return {"headline": headline, "sentences": s, "unknowns": unknown, "unknowns_explained": synthesis.explained_unknowns(p)}
 
 
 def family_states(p: Profile) -> list[dict[str, Any]]:

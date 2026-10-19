@@ -62,6 +62,8 @@ class Page:
     links: list[tuple[str, str]] = field(default_factory=list)  # (absolute url, anchor text)
     jsonld: list[dict] = field(default_factory=list)
     feeds: list[str] = field(default_factory=list)
+    scripts: list[str] = field(default_factory=list)  # same-host script bundles, for sites rendered in the browser
+    script_text: str = ""  # readable strings from inline data scripts (Next.js, Wix and similar page data)
     generator: str = ""
     sha256: str = ""
     retrieved_at: str = ""
@@ -137,6 +139,24 @@ def parse(html: str, url: str, final_url: str) -> Page:
             continue
         if absu.startswith("http"):
             p.links.append((absu, re.sub(r"\s+", " ", a.text() or "").strip()[:120]))
+    host = (urlsplit(final_url).hostname or "").lower().removeprefix("www.")
+    inline = []
+    for s in tree.css("script"):
+        src = (s.attributes.get("src") or "").strip()
+        if src:
+            try:
+                absu = urljoin(base, src)
+            except ValueError:
+                continue
+            h = (urlsplit(absu).hostname or "").lower().removeprefix("www.")
+            if absu.startswith("http") and (h == host or h.endswith("." + host)) and absu not in p.scripts:
+                p.scripts.append(absu)
+        elif (s.attributes.get("type") or "").lower() not in ("application/ld+json", "text/template"):
+            body_js = s.text() or ""
+            if len(body_js) > 200:
+                inline.append(body_js[:400_000])
+    if inline:
+        p.script_text = js_strings("\n".join(inline))[:200_000]
     for node in tree.css("script, style, noscript, svg, template, iframe"):
         node.decompose()
     body = tree.body
@@ -327,4 +347,39 @@ def internal_links(page: Page, site_host: str) -> dict[str, list[tuple[str, str]
 def parked(page: Page) -> bool:
     words = len(page.text.split())
     hay = f"{page.title}\n{page.text[:3000]}"
-    return bool(PARKED.search(hay)) and words < 400 or words < 12
+    if PARKED.search(hay) and words < 400:
+        return True
+    # a page drawn in the browser has almost no HTML text but a real title and its own scripts: not parked
+    rendered = page.scripts or len(page.script_text) > 200
+    return words < 12 and not (rendered and len(page.title.split()) >= 1 and not PARKED.search(page.title)
+                               and fold_title(page.title) not in ("", "home", "index", "untitled"))
+
+
+def fold_title(title: str) -> str:
+    return re.sub(r"\s+", " ", (title or "").strip().lower())
+
+
+JS_STRING = re.compile(r'"((?:[^"\\\n]|\\.){3,600})"|\'((?:[^\'\\\n]|\\.){3,600})\'|`((?:[^`\\]|\\.){3,600})`')
+
+
+def js_text(code: str) -> str:
+    """Readable text from a minified script bundle: escapes decoded, code punctuation turned into line breaks.
+    Robust where string matching is not (one stray quote in minified code shifts every match after it)."""
+    code = re.sub(r"\\u([0-9a-fA-F]{4})", lambda x: chr(int(x.group(1), 16)), code[:3_000_000])
+    code = code.replace("\\/", "/").replace("\\n", "\n")
+    lines = (x.strip(" \t\\") for x in re.split(r"[\"'`{}\[\]();=<>|&!?\n]+", code))
+    return "\n".join(x for x in lines if len(x) >= 3 and re.search(r"[A-Za-zÆØÅæøå0-9]", x))
+
+
+def js_strings(code: str) -> str:
+    """The human-readable string literals in JavaScript or JSON, one per line, escapes decoded."""
+    out = []
+    for m in JS_STRING.finditer(code):
+        s = m.group(1) or m.group(2) or m.group(3) or ""
+        if "\\" in s:
+            s = re.sub(r"\\u([0-9a-fA-F]{4})", lambda x: chr(int(x.group(1), 16)), s)
+            s = s.replace("\\/", "/").replace("\\n", " ").replace('\\"', '"').replace("\\'", "'").replace("\\t", " ")
+        # keep strings that read like text, not code: letters and spaces, few symbols
+        if re.search(r"[A-Za-zÆØÅæøå]{2}", s) and not re.search(r"[{};=<>]|function|=>|\.js\b|\.css\b", s):
+            out.append(re.sub(r"<[^>]{1,200}>", " ", s))
+    return "\n".join(dict.fromkeys(out))

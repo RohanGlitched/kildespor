@@ -1,0 +1,37 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.eu.greenhouse.io/cognite/jobs/4920585101",
+   "internal_job_id": 4497890101,
+   "location": {
+    "name": "Norway (remote)"
+   },
+   "id": 4920585101,
+   "updated_at": "2026-09-30T14:12:21-04:00",
+   "requisition_id": "369",
+   "title": "Business Development Director – Supply Chain Center of Excellence (CoE)",
+   "company_name": "Cognite - AI for Industry",
+   "first_published": "2026-09-17T10:35:49-04:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.eu.greenhouse.io/cognite/jobs/4948187101",
+   "internal_job_id": 4510221101,
+   "location": {
+    "name": "USA (Houston); USA (remote)"
+   },
+   "id": 4948187101,
+   "updated_at": "2026-10-12T13:12:18-04:00",
+   "requisition_id": "409",
+   "title": "Account Executive",
+   "company_name": "Cognite - AI for Industry",
+   "first_published": "2026-08-10T12:40:27-04:00",
+   "language": "en",
+   "application_deadline": null
+  }
+ ],
+ "meta": {
+  "total": 2
+ }
+}

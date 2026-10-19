@@ -163,6 +163,12 @@ class NavJobs(Source):
         return found
 
     async def enrich(self, ctx, p, ent, subunits, sites) -> None:
+        try:
+            await self._enrich(ctx, p, ent, subunits, sites)
+        finally:  # the careers source waits for NAV's postings so that it never publishes the same ad twice
+            p.notes.setdefault("_nav_done", asyncio.Event()).set()
+
+    async def _enrich(self, ctx, p, ent, subunits, sites) -> None:
         if self.prepare_error:
             raise RuntimeError(self.prepare_error)
         p.checked_source("jobs", f"NAV job vacancy feed (last {self.window_days} days)")

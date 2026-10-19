@@ -1,0 +1,40 @@
+{
+ "statusCode": 200,
+ "data": {
+  "job_posts": [
+   {
+    "AdID": 489341,
+    "Name": "Would you like to help shape the next chapter of Aimo Park's commercial development?",
+    "EmpName": "Aimo Park Norway",
+    "Place": "Oslo",
+    "JobTitle": "Commercial Director",
+    "Expire": "2026-11-08",
+    "Created": "2026-10-07 07:35:08",
+    "Deadline": "08.11.2026",
+    "EmployeesOnly": 0
+   },
+   {
+    "AdID": 489643,
+    "Name": "Do you want to make an impact on Corporate Accounting at KONGSBERG?",
+    "EmpName": "KONGSBERG DEFENCE & AEROSPACE AS",
+    "Place": "KONGSBERG/Oslo",
+    "JobTitle": "Accountant",
+    "Expire": "2026-11-01",
+    "Created": "2026-10-09 09:24:36",
+    "Deadline": "01.11.2026",
+    "EmployeesOnly": 0
+   },
+   {
+    "AdID": 488000,
+    "Name": "Intern stilling",
+    "EmpName": "Aimo Park Norway",
+    "Place": "Oslo",
+    "JobTitle": "Intern",
+    "Expire": "2026-11-08",
+    "Created": "2026-10-01 07:35:08",
+    "Deadline": "",
+    "EmployeesOnly": 1
+   }
+  ]
+ }
+}

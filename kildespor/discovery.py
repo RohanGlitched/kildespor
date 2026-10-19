@@ -60,7 +60,8 @@ def domain_of(value: str) -> str:
 
 HOSTED = ("weebly.com", "wixsite.com", "wordpress.com", "blogspot.com", "squarespace.com", "webflow.io", "github.io",
           "netlify.app", "vercel.app", "business.site", "mystrikingly.com", "jimdofree.com", "jimdosite.com", "one.com",
-          "teamtailor.com", "shopify.com", "myshopify.com", "carrd.co", "simplesite.com", "123hjemmeside.no", "hjemmeside.no")
+          "teamtailor.com", "shopify.com", "myshopify.com", "carrd.co", "simplesite.com", "123hjemmeside.no", "hjemmeside.no",
+          "barnehage.no", "idrettenonline.no", "origo.no", "custompublish.com", "wix.com", "mamutweb.com", "ihost.no")
 SHARED_MAIL = {"styrerommet.no", "vibbo.no", "obos.no", "boligbygg.no", "usbl.no", "nordbohus.no", "bate.no", "bori.no",
                "tobb.no", "ibo.no", "boligpartner.no", "regnskapshuset.no", "azets.com", "visma.com", "eika.no"}
 
@@ -72,7 +73,7 @@ def registrable(domain: str) -> str:
             sub = domain[: -len(h) - 1].split(".")[-1]
             return f"{sub}.{h}"
     parts = domain.split(".")
-    if len(parts) >= 3 and parts[-2] in ("co", "com", "org", "net", "priv") and parts[-1] in ("no", "uk", "se"):
+    if len(parts) >= 3 and parts[-2] in ("co", "com", "org", "net", "priv", "ac", "gov", "edu", "or", "ne") and len(parts[-1]) == 2:
         return ".".join(parts[-3:])
     return ".".join(parts[-2:])
 
@@ -114,6 +115,10 @@ def name_domains(name: str, limit: int = 14) -> list[str]:
     add("".join(t.replace("ae", "ae") for t in alt))
     oe = [re.sub("ø", "oe", re.sub("å", "aa", t)) for t in raw_tokens]
     add("".join(fold(t) for t in oe))
+    # "Værbitt" is often varbitt.no or verbitt.no
+    if any("æ" in t for t in raw_tokens):
+        for sub in ("a", "e"):
+            add("".join(fold(t.replace("æ", sub)) for t in raw_tokens))
     # native IDN
     native = "".join(raw_tokens)
     if re.search("[æøå]", native):
@@ -125,6 +130,10 @@ def name_domains(name: str, limit: int = 14) -> list[str]:
         add("-".join(core[:2]))
     if len(core) >= 1 and len(core[0]) >= 5:
         add(core[0])
+        first = next((t for t in raw_tokens if fold(t) == core[0]), "")
+        for sub in ("a", "e"):
+            if "æ" in first:
+                add(fold(first.replace("æ", sub)))
     out = [lab + ".no" for lab in labels]
     out += [lab + ".com" for lab in labels[:3]]
     return out[:limit]

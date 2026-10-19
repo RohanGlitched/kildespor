@@ -33,10 +33,30 @@ with the page URL, retrieval time, content hash and the exact text span:
 | `legal_name` | the exact legal name with its legal form in capitals ("Fjellform AS", never the English word "as"), letters æ/ø/å and punctuation kept, on a name-derived or declared domain, **and** the registered town or postcode on the site | 0.90 |
 | `legal_name_town` | for co-ops, foundations and other forms without a suffix: the exact full name plus the registered town, on a name-derived domain | 0.90 |
 | `role_holder_and_name` | a current role holder's full name from the role register **and** every legal-name token on the same page | 0.88–0.90 |
+| `name_street` | every legal-name token **and** the registered street line with its house number on one page (no postcode needed), on a site whose domain spells the whole name or that the entity declared | 0.92 |
+| `registry_declared_name` | a site the entity declared in the register (or for a registered workplace) whose home page names it in full: every distinctive legal-name word together in the title, site name, description, Organization JSON-LD or host name; a one-word name needs five or more letters and a home page with real content | 0.90 |
+| `name_domain_town` | a guessed domain that spells the whole name (eight or more letters), a home page titled with the whole name, **and** the registered town or postcode on the site (a town that is part of the name does not count; then only the postcode does) | 0.90 |
+| `unique_name_domain` | a guessed **.no** domain that spells the whole name, a home page titled with it, and a register search (entities and workplaces) that finds no other active entity whose name equals or starts with ours | 0.90 |
+
+Every name-based proof refuses a title or name that carries a foreign company form ("Kriss Consulting Inc",
+"… GmbH", "… Ltd"): that names another legal entity. A site that the browser draws from JavaScript has
+little HTML text; its page data and up to three of its own script bundles are read as extra pages, so an
+"Org.nr" printed by a React footer still proves the site (the quoted span is the exact line in the archived
+bundle).
 
 A website or e-mail domain declared in the register is a *candidate*, never proof on its own: property
 managers, parents, chains and sister companies are often declared (our audit found 2 of 12 such sites
 were the entity's own). The declared value is still published as a registry fact (`registered_website`).
+The `registry_declared_name` proof is the narrow exception: the declared site must also name the entity in
+full on its home page, which managers' and parents' sites do not.
+
+**Sibling check.** A site proven without the organisation number is withheld when its brand stem (domain
+label, site name, or the title part that is not a page word such as "Hjem" or "Forside") is the exact name of
+another active entity, because sister companies share addresses, phones and owners. The exception: when the
+site prints our exact legal name with its legal form and that other entity is registered in a different
+municipality, it is a namesake, not a sister (`okkenhaug.no` is Okkenhaug Bil AS in Trondheim, not the
+ceramics firm "Okkenhaug" in Oslo; `andvordgruppen.no` stays rejected for Andvord Invest AS because
+Andvordgruppen AS sits at the same Oslo address).
 
 A second website is published only when it too shows the organisation number.
 
@@ -50,7 +70,8 @@ Rejections, all visible in the discovery trace:
 - **ambiguous**: a live site with none of the proofs above (for example a dictionary-word domain such
   as `nordlys.no`, or `raservice.no`, which belongs to *RA Service AS* in Oslo, not *RÅ SERVICE AS* in
   Holmestrand).
-- **blocked**: robots.txt disallows our user agent.
+- **blocked**: robots.txt disallows our user agent. The company's website state is `blocked` only when a
+  site the entity declared refuses us; a guessed domain that refuses crawlers says nothing about the company.
 
 ## Everything else hangs off the verified site or the organisation number
 
@@ -64,6 +85,26 @@ Rejections, all visible in the discovery trace:
   registered; foreign numbers, digit runs and year pairs are rejected.
 - **Job ads**: NAV records whose `employer.orgnr` is ours or one of our registered subunits'
   (subunit matches are labelled `registered_subunit`). JobPosting JSON-LD on the verified site.
+- **Job ads on recruitment platforms** (Teamtailor, Recman, ReachMee, Jobylon, Jobbnorge, Easycruit, Mojob,
+  Lever, Greenhouse, Recruitee, and the site's own careers page; see SOURCES.md). A posting is published,
+  labelled `exact`, only when all of these hold:
+  1. the platform page was reached from a link or embed on the verified site (never from a search);
+  2. the employer the platform names for that posting — or, when the platform names none per posting
+     (Teamtailor, ReachMee, Lever, Greenhouse), the account's own name — is our legal name. "Matches" is
+     strict: the same name words (legal form, "og/&" and Norway/Norge ignored); or our full name followed
+     only by a place or a department word; or our name without a trailing "Norge". A name carrying its own
+     legal form ("Aberia Omsorg & Assistanse AS" for ABERIA AS, "Pincho Nation Tromsø AS"), a foreign form
+     (AB, GmbH, Ltd), a group name ("MiO Gruppen" for MIO BPA AS) or a parent ("ScaleAQ" for PROBOTIC AS)
+     never matches. A staffing agency's account (Recman, "Jefferson Wells") listing ads for many clients
+     keeps only the ads whose employer is us; a group account listing several companies keeps only ours;
+  3. the posting names no organisation number other than ours or a registered subunit's;
+  4. it is not expired (deadline in the past), not an open application, and not located abroad
+     (Lever and Greenhouse boards of international companies: Norwegian locations only);
+  5. it is not already in the profile from NAV (same link, or same title within 7 days of the NAV date;
+     the careers source waits for NAV's postings first).
+  Plain ads on the company's own careers page also need ad wording, the company's name on the ad page,
+  and no "hos X"/"Arbeidsgiver: X" naming another employer — a shopping centre's "Ledig stilling hos Lekia"
+  is never published under the centre.
 - **News**: the verified site's own RSS/Atom feed, JSON-LD articles, or dated headlines on its news page.
 - **Registered workplaces, roles and accounts**: official records keyed by the organisation number.
 
