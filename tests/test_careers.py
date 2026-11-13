@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from kildespor import siteparse as sp
 from kildespor.claims import Claim, Evidence, Profile
 from kildespor.sources import careers as cs
@@ -9,6 +11,12 @@ from kildespor.sources import careers as cs
 FX = Path(__file__).parent / "fixtures" / "careers"
 VIA = {"url": "https://firma.no/karriere", "retrieved_at": "2026-10-19T00:00:00Z", "sha256": "0" * 64, "status": 200,
        "span": "link on https://firma.no/karriere", "host": "firma.no"}
+
+
+@pytest.fixture(autouse=True)
+def _fixed_today(monkeypatch):
+    """The fixtures were saved on 2026-10-19; deadlines are judged against that day."""
+    monkeypatch.setattr(cs, "_today", lambda: "2026-10-19")
 
 
 class F:  # a stand-in for http.Fetched
@@ -230,3 +238,171 @@ def test_platforms_not_yet_hand_checked_publish_nothing():
     assert "greenhouse" not in cs.ENABLED and "lever" not in cs.ENABLED and "mojob" not in cs.ENABLED
     p, _ = _publish("FIRMA AS", [(x, VIA, F("https://boards-api.greenhouse.io/v1/boards/firma/jobs")) for x in posts])
     assert not [c for c in p.claims if c.field == "job_posting"]
+
+
+# ---------------------------------------------------------------------------------------------
+# reject rules added in revision 2 (each with the real page that prompted it)
+
+def test_standing_apprentice_page_with_far_deadline_is_not_an_open_posting():
+    # Finnfjord's ReachMee list: 'Åpen Søknad' and 'Lærling' due 2030-12-31 ("vi tar årlig opp lærlinger")
+    account, posts = cs.parse_reachmee_list((FX / "reachmee-list.html").read_text(encoding="utf-8"),
+                                            "https://web103.reachmee.com/ext/I012/2645/main?site=6")
+    for x in posts:
+        x.extra["account"] = account
+    p, src = _publish("FINNFJORD AS", [(x, VIA, F("https://web103.reachmee.com/ext/I012/2645/main?site=6")) for x in posts])
+    assert not [c for c in p.claims if c.field == "job_posting"]
+    assert src.stats["skipped_evergreen"] == 1 and src.stats["skipped_open_application"] == 1
+
+
+def test_stale_markup_without_deadline_is_skipped():
+    post = cs.Posting("site", "https://firma.no/karriere#x", "Utvikler", "https://firma.no/karriere", published="2025-09-01",
+                      employer="Firma AS")
+    p, src = _publish("FIRMA AS", [(post, VIA, None)])
+    assert not [c for c in p.claims if c.field == "job_posting"] and src.stats["skipped_stale"] == 1
+
+
+def test_markup_without_employer_counts_only_on_the_careers_page():
+    ld = {"@type": "JobPosting", "title": "Lagermedarbeider", "datePosted": "2026-10-01"}
+    html = ('<html><head><title>Karriere</title><script type="application/ld+json">' + json.dumps(ld) +
+            '</script></head><body>Lagermedarbeider</body></html>')
+    on = cs.jsonld_postings(sp.parse(html, "https://firma.no/karriere", "https://firma.no/karriere"))
+    off = cs.jsonld_postings(sp.parse(html, "https://firma.no/produkter/hylle", "https://firma.no/produkter/hylle"))
+    on[0].extra["on_careers"], off[0].extra["on_careers"] = True, False
+    on[0].extra["span"] = "Lagermedarbeider"
+    p, _ = _publish("FIRMA AS", [(on[0], VIA, None)])
+    jobs = [c for c in p.claims if c.field == "job_posting"]
+    assert len(jobs) == 1 and jobs[0].value["employer"] == "FIRMA AS" and jobs[0].evidence[0].claim_span == "Lagermedarbeider"
+    p2, _ = _publish("FIRMA AS", [(off[0], VIA, None)])
+    assert not [c for c in p2.claims if c.field == "job_posting"]
+
+
+def test_value_has_deadline_posted_and_literal_listing_span():
+    account, posts = cs.parse_teamtailor_rss((FX / "teamtailor.rss").read_bytes())
+    for x in posts:
+        x.extra["account"] = account
+    body = (FX / "teamtailor.rss").read_bytes()
+    p, _ = _publish("PINCHO NATION NORGE AS", [(posts[0], VIA, F("https://pinchonationnorway.teamtailor.com/jobs.rss", body))])
+    c = next(c for c in p.claims if c.field == "job_posting")
+    assert {"title", "url", "status", "source", "posted"} <= set(c.value) and c.value["status"] == "open"
+    span = c.evidence[0].claim_span
+    assert all(piece in body.decode("utf-8") for piece in span.split(" · ")) and "Hovmester" in span
+
+
+def test_site_brand_names_the_recruitment_account():
+    w = cs.Who({"navn": "NORGES GEOTEKNISKE INSTITUTT AS"}, [], "932089114", ["ngi", "NGI"])
+    assert w.match("NGI")                       # ngi.teamtailor.com reached from ngi.no
+    assert not w.match("NGI Consult AS")         # another registered entity
+    g = cs.Who({"navn": "BERTEL O. STEEN HOLDING AS"}, [], "997755278", ["boskonsern"])
+    assert not g.match("BOS konsern")            # a group's account lists its companies
+
+
+def test_own_site_ad_rejects_products_news_and_empty_careers_pages():
+    w = who("FIRMA AS")
+    base = "Stillingsprosent: 100%\nSøknadsfrist: 01.12.2026\nFirma AS søker en lagermedarbeider."
+    ad = _page("https://firma.no/ledige-stillinger/lagermedarbeider", "Lagermedarbeider - Firma", base)
+    post = cs.own_site_ad(ad, "Lagermedarbeider", w)
+    assert post and post.deadline == "2026-12-01" and post.extra["span"] == "Lagermedarbeider · Søknadsfrist: 01.12.2026"
+    product = _page("https://firma.no/stillinger/skreddersom", "Skreddersøm - Firma", base)
+    product.jsonld = [{"@type": "Product", "name": "Skreddersøm"}]
+    assert cs.own_site_ad(product, "Skreddersøm", w) is None  # a made-to-measure service page is not a job
+    news = _page("https://firma.no/nyheter/vi-soker-lagermedarbeider", "Vi søker lagermedarbeider - Firma", base)
+    assert cs.own_site_ad(news, "x", w) is None
+    empty = _page("https://firma.no/karriere/jobb", "Jobb hos oss - Firma", base + "\nVi har for tiden ingen ledige stillinger.")
+    assert cs.own_site_ad(empty, "x", w) is None
+
+
+def test_ad_outside_the_careers_path_needs_a_strong_marker():
+    w = who("DEN INDRE SJØMANNSMISJON")
+    careers = _page("https://www.dism.no/ledig-stilling", "Ledig stilling", "",
+                    [("https://www.dism.no/new-page", "Stillingsutlysning"), ("https://www.dism.no/skipsbesok", "Skipsbesøk")])
+    assert cs._anchor_ads(careers, "dism") == [("https://www.dism.no/new-page", "Stillingsutlysning")]
+    weak = _page("https://www.dism.no/new-page", "Administrasjonsleder | Den indre Sjømannsmisjon",
+                 "Vi søker en administrasjonsleder. Den indre Sjømannsmisjon")
+    assert cs.own_site_ad(weak, "Stillingsutlysning", w, under_careers=False) is None
+    strong = _page(weak.url, weak.title, weak.text + "\nSøknadsfrist: 01.12.2026")
+    assert cs.own_site_ad(strong, "Stillingsutlysning", w, under_careers=False).title == "Administrasjonsleder"
+
+
+def test_careers_page_rule():
+    w = who("FIRMA AS")
+
+    def reason(url, title="Jobb hos oss", text="Vi søker nye kolleger", links=None):
+        return cs.careers_page_reason(_page(url, title, text, links), w, "firma")
+    for ok in ("https://firma.no/karriere", "https://firma.no/ledige-stillinger/", "https://firma.no/jobb-hos-oss",
+               "https://firma.no/om-oss/jobb-i-firma/", "https://firma.no/career", "https://karriere.firma.no/"):
+        assert reason(ok) is None, ok
+    for bad in ("https://firma.no/utstilling", "https://firma.no/timebestilling/", "https://firma.no/butikk/verkstedutstyr/4-hjulstilling",
+                "https://firma.no/kort-vei-til-jobb/", "https://firma.no/jobb-og-studie", "https://firma.no/jobbmotivasjon/",
+                "https://firma.no/kurs/kursbestilling", "https://firma.no/bestillingsportal/",
+                "https://firma.no/veiledning-for-store-tekstilbestillinger/", "https://annen.no/karriere"):
+        assert reason(bad) is not None, bad
+    tenants = [("https://firma.no/stillinger/ledig-stilling-hos-floyd/", "Ledig stilling hos Floyd"),
+               ("https://firma.no/stillinger/ledig-stilling-hos-vila/", "Ledig stilling hos Vila")]
+    assert reason("https://firma.no/stillinger/", "Ledige stillinger hos Firma", links=tenants) == "lists jobs at other businesses"
+
+
+def test_recruitment_account_is_the_companys_own():
+    w = cs.Who({"navn": "NORGES GEOTEKNISKE INSTITUTT AS"}, [], "932089114", ["ngi"])
+    assert cs.recruitment_account("https://ngi.teamtailor.com/jobs", w, "ngi") == "teamtailor"
+    assert cs.recruitment_account("https://karriere.ngi.no/", w, "ngi") == "own career site"
+    for generic in ("https://www.finn.no/job", "https://arbeidsplassen.nav.no/", "https://www.webcruiter.no/",
+                    "https://miogruppen.teamtailor.com/jobs", "https://karriere.annen.no/", "https://app.teamtailor.com/"):
+        assert cs.recruitment_account(generic, w, "ngi") is None, generic
+
+
+def test_extract_careers_claims():
+    from types import SimpleNamespace
+    from kildespor import extract
+    home = _page("https://firma.no/", "Firma AS", "Velkommen", [("https://firma.teamtailor.com/jobs", "Ledige stillinger"),
+                                                               ("https://www.finn.no/job", "FINN jobb")])
+    bad = _page("https://firma.no/timebestilling", "Timebestilling | Firma", "Bestill time")
+    good = _page("https://firma.no/karriere", "Karriere i Firma", "Vi søker nye kolleger")
+    res = SimpleNamespace(home=home, pages=[home, bad, good], foreign_host=False)
+    p = Profile("923609016")
+    p.notes["entity"] = {"navn": "FIRMA AS"}
+    extract._careers(p, res, {"job_links": []})
+    cp = [c for c in p.claims if c.field == "careers_page"]
+    rc = [c for c in p.claims if c.field == "recruitment_channel"]
+    assert [c.value["url"] for c in cp] == ["https://firma.no/karriere"] and cp[0].evidence[0].claim_span == "Karriere i Firma"
+    assert [c.value["platform"] for c in rc] == ["teamtailor"]
+    res.foreign_host = True
+    p2 = Profile("923609016")
+    p2.notes["entity"] = {"navn": "FIRMA AS"}
+    extract._careers(p2, res, {"job_links": []})
+    assert not p2.claims
+
+
+def test_careers_page_listing_a_sister_companys_jobs_is_not_ours():
+    text = "Ledige stillinger\nSelskap:\n Aberia Omsorg & Assistanse AS\nSted:\n Norge\nSøknadsfrist:\n 13.11.2026"
+    pg = _page("https://www.aberia.no/jobb-i-aberia/ledige-stillinger/", "Ledige stillinger i Aberia", text)
+    assert cs.careers_page_reason(pg, who("ABERIA AS"), "aberia") == "lists jobs at another company"
+    assert cs.careers_page_reason(pg, who("ABERIA OMSORG & ASSISTANSE AS"), "aberia") is None
+
+
+def test_recruitment_account_skips_login_pages_and_foreign_domains():
+    w = who("BONLIVA AS")
+    assert cs.recruitment_account("https://bonliva.recman.no/login.php", w, "bonliva", "bonliva.no") is None
+    assert cs.recruitment_account("https://bonliva.recman.no/register.php", w, "bonliva", "bonliva.no") is None
+    assert cs.recruitment_account("https://bonliva.recman.no/jobs", w, "bonliva", "bonliva.no") == "recman"
+    assert cs.recruitment_account("https://career.bonliva.se/", w, "bonliva", "bonliva.no") is None  # the Swedish sister's site
+    assert cs.recruitment_account("https://career.bonliva.no/", w, "bonliva", "bonliva.no") == "own career site"
+
+
+def test_group_career_site_ad_naming_a_sister_company_is_skipped():
+    # jobs.avarnsecurity.com carries the group's brands; each ad names its company in a field
+    w = who("AVARN SECURITY AS")
+    menu = "OM OSS\nAVARN SECURITY\nNOKAS\nAVARN SECURITY AS\n"
+    own = _page("https://jobs.avarnsecurity.com/job/Ski-Vekter/1/", "Vekter til datasenter",
+                menu + "Egendefinert felt 4: \nAvarn Security AS\nStillingsprosent: 100%\nSøk nå")
+    other = _page("https://jobs.avarnsecurity.com/job/Oslo-Vekter/2/", "Vekter til Nokas",
+                  menu + "Egendefinert felt 4: \nNokas AS\nStillingsprosent: 100%\nSøk nå")
+    assert cs.own_site_ad(own, "Vekter", w) is not None
+    assert cs.own_site_ad(other, "Vekter", w) is None
+
+
+def test_ad_title_drops_section_and_site_names_and_span_quotes_the_page():
+    w = cs.Who({"navn": "LOYALTY AS"}, [], "935431557", ["loyalty"])
+    pg = _page("https://www.loyalty.no/karriere/salgskonsulent-heltid", "Salgskonsulent heltid | Karriere | Loyalty",
+               "Karriere\nSalgskonsulent heltid\nVi søker en salgskonsulent til Loyalty.\nSøk på stillingen")
+    post = cs.own_site_ad(pg, "Les mer", w)
+    assert post.title == "Salgskonsulent heltid" and post.extra["span"] == "Salgskonsulent heltid"

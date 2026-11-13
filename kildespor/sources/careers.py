@@ -78,7 +78,21 @@ AD_MARKERS = re.compile(r"s[øo]knadsfrist|stillingsprosent|tiltredelse|how to a
                         r"s[øo]k (?:p[åa] )?(?:stillingen|her|n[åa])|apply (?:now|here|for this)|we are looking for|vi s[øo]ker",
                         re.I)
 OPEN_APPLICATION = re.compile(r"[åa]pen (?:s[øo]knad|stillingsutlysning|utlysning)|open application|generell s[øo]knad|spontans[øo]knad|"
-                              r"talent ?pool|talentbank|interesseliste", re.I)
+                              r"spontaneous application|unsolicited application|talent ?pool|talent ?community|talentbank|"
+                              r"interesseliste|interessemelding|registrer (?:deg|din cv|cv)|send oss (?:din )?cv|"
+                              r"fremtidige (?:stillinger|muligheter|behov)|future (?:opportunities|openings)", re.I)
+# on a whole page (menus and footers included) only the unmistakable wording counts
+OPEN_APPLICATION_PAGE = re.compile(r"[åa]pen (?:s[øo]knad|stillingsutlysning|utlysning)|open application|generell s[øo]knad|"
+                                   r"spontans[øo]knad|talent ?pool|talentbank|interesseliste", re.I)
+# strong signs that a page is one job ad (weak ones such as "vi søker" also appear on service pages)
+STRONG_MARKERS = re.compile(r"s[øo]knadsfrist|stillingsprosent|tiltredelse|stillingstittel|arbeidssted|ans[æa]ttelsesform|"
+                            r"s[øo]k (?:p[åa] )?stillingen|send (?:din|en|oss din) s[øo]knad|how to apply|apply (?:now|here|for this)|"
+                            r"application deadline|employment type|start date|ledig (?:fast )?stilling som", re.I)
+NOT_AN_AD = re.compile(r"legg i handlekurv|add to (?:cart|basket)|kj[øo]p n[åa]|handlekurv|bestill (?:n[åa]|time)|book (?:time|tid)|"
+                       r"vi har (?:for tiden|for øyeblikket|dessverre )?ingen ledige stillinger|no (?:open|current) (?:positions|vacancies)", re.I)
+NEWS_PATH = re.compile(r"/(news|nyheter|nyhet|aktuelt|artikler|artikkel|blogg?|presse|press|arkiv)(/|$)", re.I)
+EVERGREEN_DAYS = 365      # a deadline further away than this is a standing "always hiring" page, not an open posting
+STALE_DAYS = 270          # a posting dated this long ago with no deadline is a leftover
 NORWAY = re.compile(r"\b(norway|norge|noreg|oslo|bergen|trondheim|stavanger|troms[øo]|kristiansand|drammen|fredrikstad|"
                     r"sandnes|[åa]lesund|bod[øo]|haugesund|lillestr[øo]m|asker|b[æa]rum|lysaker|fornebu|kongsberg|"
                     r"t[øo]nsberg|sandefjord|moss|hamar|gj[øo]vik|lillehammer|molde|arendal|larvik|skien|porsgrunn|horten|"
@@ -110,13 +124,17 @@ def _contiguous(small: tuple, big: tuple) -> bool:
 class Who:
     """Whether a name on a recruitment platform is our legal entity."""
 
-    def __init__(self, ent: dict, subunits: list | None = None, orgnr: str = "") -> None:
+    def __init__(self, ent: dict, subunits: list | None = None, orgnr: str = "", brands: list[str] | None = None) -> None:
         self.name = ent.get("navn", "")
         self.legal = _sig(self.name)
         self.compact = "".join(self.legal)
         self.own = {orgnr or ent.get("organisasjonsnummer", "")} | {u.get("organisation_number") for u in subunits or []
                                                                      if u.get("organisation_number")}
         self.own.discard("")
+        # the verified site's own brand (its domain label, its og:site_name): a recruitment account reached from that
+        # site and named exactly like it is the company's ("NGI" on ngi.no for NORGES GEOTEKNISKE INSTITUTT AS)
+        self.brands = {b for b in ("".join(_sig(x)) for x in brands or [])
+                       if len(b) >= 3 and not re.search(r"konsern|gruppen|group|holding", b)}  # a group's account lists its companies
 
     def match(self, name: str | None) -> bool:
         if not name or not self.legal:
@@ -125,6 +143,8 @@ class Who:
         if not n:
             return False
         if n == self.legal or "".join(n) == self.compact:
+            return True
+        if "".join(n) in self.brands and not _has_form(name):
             return True
         raw = name_tokens(name, drop_forms=False)
         if any(t in FOREIGN_FORMS for t in raw) or re.search(r"\b(ab|aps|gmbh|ltd|inc|oy)\b", name.lower()):
@@ -502,8 +522,9 @@ GENERIC_ANCHOR = re.compile(r"^(view|see|read|les|se|s[øo]k|apply|mer|more|deta
 
 def _ad_title(page: sp.Page, anchor: str, who: Who) -> str:
     segs = [x.strip() for x in re.split(r"\s+[|\-–—]\s+", page.title or "") if x.strip()]
-    while len(segs) > 1 and (who.match(segs[-1]) or len(segs[-1]) < 3):
-        segs.pop()  # the site-name suffix
+    while len(segs) > 1 and (who.match(segs[-1]) or len(segs[-1]) < 3 or "".join(_sig(segs[-1])) in who.brands
+                             or re.fullmatch(r"karriere|careers?|jobb(?:e)?(?: hos oss)?|jobs|(?:ledige )?stillinger|vacancies", segs[-1], re.I)):
+        segs.pop()  # the site-name suffix and the section name ('Salgskonsulent heltid | Karriere | Loyalty')
     cands = [" - ".join(segs), anchor or ""]
     slug = urlsplit(page.final_url).path.rstrip("/").split("/")[-1]
     if slug.count("-") >= 1 and not slug.isdigit():
@@ -515,33 +536,80 @@ def _ad_title(page: sp.Page, anchor: str, who: Who) -> str:
     return ""
 
 
-def own_site_ad(page: sp.Page, anchor: str, who: Who) -> Posting | None:
-    """A plain job ad on the company's own site: a page under the careers page that reads like an ad,
-    names our company, and names no other employer and no other organisation number."""
-    if not AD_MARKERS.search(page.text or ""):
+HOS = re.compile(r"\b(?:hos|at|with|i)\s+([A-ZÆØÅ][\wÆØÅæøå&.'’\-]*(?:\s+[A-ZÆØÅ][\wÆØÅæøå&.'’\-]*){0,3})")
+NON_AD_TYPES = {"Product", "Offer", "AggregateOffer", "Service", "NewsArticle", "BlogPosting", "Article", "Event", "Recipe", "Course"}
+
+
+def _other_employer(text: str, who: Who) -> bool:
+    """'Ledig stilling hos Lekia' on a shopping centre's site: the text names a different employer."""
+    m = HOS.search(text or "")
+    return bool(m) and not NORWAY.search(fold(m.group(1))) and not who.match(m.group(1))
+
+
+def _line_with(text: str, rx: re.Pattern, limit: int = 120) -> str:
+    for line in (text or "").splitlines():
+        if rx.search(line):
+            return clip(line.strip(), limit)
+    return ""
+
+
+def page_span(page_text: str, title: str, extra: list[str] | None = None) -> str:
+    """Literal pieces of a fetched page that state the posting: its title and its deadline line, as written there."""
+    pieces = []
+    if title and fold(re.sub(r"\s+", " ", title)) in fold(re.sub(r"\s+", " ", page_text or "")):
+        pieces.append(title)
+    for x in extra or []:
+        if x and x not in pieces:
+            pieces.append(x)
+    return " · ".join(pieces)
+
+
+def own_site_ad(page: sp.Page, anchor: str, who: Who, under_careers: bool = True) -> Posting | None:
+    """A plain job ad on the company's own site: a page linked from the careers page that reads like one ad,
+    names our company, and names no other employer and no other organisation number. Pages linked from the
+    careers page but outside its path must carry a strong ad marker (a deadline, a position size, ...)."""
+    text = page.text or ""
+    path = urlsplit(page.final_url).path
+    if not AD_MARKERS.search(text) or (not under_careers and not STRONG_MARKERS.search(text)):
         return None
+    if NEWS_PATH.search(path):
+        return None  # a news article about hiring is not the posting
+    types = {t for n in page.jsonld for t in (n.get("@type") if isinstance(n.get("@type"), list) else [n.get("@type")])}
+    if types & NON_AD_TYPES and "JobPosting" not in types:
+        return None  # a product, service or article page
+    if NOT_AN_AD.search(text):
+        return None  # a shop or booking page, or a careers page saying there is nothing open
     title = _ad_title(page, anchor, who)
-    if not title or OPEN_APPLICATION.search(title) or CAREER_INFO.search(title) or CAREER_INFO.search(urlsplit(page.final_url).path):
+    if not title or OPEN_APPLICATION.search(title) or CAREER_INFO.search(title) or CAREER_INFO.search(path):
         return None
-    if OPEN_APPLICATION.search(page.text or ""):
+    if OPEN_APPLICATION_PAGE.search(text):
         return None  # a page about working here that invites open applications, not one ad
-    for t in (title, anchor or ""):
-        hos = re.search(r"\b(?:hos|at|with)\s+([A-ZÆØÅ][\wÆØÅæøå&.\-]*(?:\s+[A-ZÆØÅ][\wÆØÅæøå&.\-]*){0,3})", t)
-        if hos and not NORWAY.search(fold(hos.group(1))) and not who.match(hos.group(1)):
-            return None  # "Ledig stilling hos Lekia" on a shopping centre's site
-    emp = re.search(r"(?:arbeidsgiver|employer|selskap|company)\s*:\s*([^\n]{2,60})", page.text or "", re.I)
+    if _other_employer(title, who) or _other_employer(anchor or "", who):
+        return None
+    emp = re.search(r"(?:arbeidsgiver|employer|selskap|company)\s*:\s*([^\n]{2,60})", text, re.I)
     if emp and not who.match(emp.group(1)):
         return None
-    if who.other_orgnr(page.text):
+    # any 'Field: Some Company AS' line naming another registered company (a group career site lists several brands)
+    for m in re.finditer(r":[ \t]*\n?[ \t]*([^\n:]{2,60}?\s(?:AS|ASA|SA|ANS|DA|AB|A/S))[ \t]*(?=\n|$)", text):
+        if not who.match(m.group(1)):
+            return None
+    if who.other_orgnr(text):
         return None
-    words = set(re.findall(r"[a-z0-9]+", fold(page.text or "")))
-    if not set(who.legal) <= words:
+    words = set(re.findall(r"[a-z0-9]+", fold(text)))
+    compact = re.sub(r"[^a-z0-9]", "", fold(text))
+    if not (set(who.legal) <= words or any(b in words or (len(b) >= 6 and b in compact) for b in who.brands)):
         return None  # the ad itself names the company
     due = None
-    m = re.search(r"s[øo]knadsfrist\s*:?\s*([^\n]{0,40})", page.text or "", re.I)
+    due_line = _line_with(text, re.compile(r"s[øo]knadsfrist|application deadline|s[øo]k (?:innen|senest)|apply by", re.I))
+    m = re.search(r"(?:s[øo]knadsfrist|application deadline|s[øo]k (?:innen|senest)|apply by)\s*:?\s*(.{0,40})", text, re.I)
     if m:
         due = _iso(m.group(1))
-    return Posting("site", page.final_url, title, page.final_url, deadline=due, employer=who.name)
+    post = Posting("site", page.final_url, title, page.final_url, deadline=due, employer=who.name)
+    span = page_span(text + "\n" + (page.title or ""), title, [due_line])
+    if not span.startswith(title) and page.title:
+        span = " · ".join(x for x in (page.title, due_line) if x)  # the page's own <title>, as written
+    post.extra["span"] = span
+    return post
 
 
 def _children(pg: sp.Page, site_label: str) -> list[tuple[str, str]]:
@@ -558,6 +626,122 @@ def _children(pg: sp.Page, site_label: str) -> list[tuple[str, str]]:
                 and not re.search(r"\.(pdf|jpe?g|png|docx?)$", child, re.I) and u not in [x[0] for x in out]:
             out.append((u, text or ""))
     return out
+
+
+AD_ANCHOR = re.compile(r"stillingsutlysning|stillingsannonse|ledig stilling|se stillingen|les (?:hele )?annonsen|"
+                       r"s[øo]k (?:p[åa] )?(?:stillingen|her|n[åa])|view (?:role|job|position)|apply now|read more about the (?:role|position)", re.I)
+
+
+def _anchor_ads(pg: sp.Page, site_label: str) -> list[tuple[str, str]]:
+    """Same-site links from a careers page whose anchor names an ad, outside the careers path ('Stillingsutlysning' -> /new-page)."""
+    parent = urlsplit(pg.final_url).path.rstrip("/")
+    if not (LIST_PATH.search(parent) or CAREERS_PATH.search(parent)):
+        return []
+    out: list[tuple[str, str]] = []
+    for u, text in pg.links:
+        s = urlsplit(u)
+        u = u.split("#")[0]
+        if _label(s.hostname or "") != site_label or s.path.rstrip("/").startswith(parent + "/") or u.rstrip("/") == pg.final_url.rstrip("/"):
+            continue
+        if not AD_ANCHOR.search(text or "") or LIST_ANCHOR.search(text or "") or re.search(r"\.(pdf|jpe?g|png|docx?)$", s.path, re.I):
+            continue
+        if NEWS_PATH.search(s.path) or u in [x[0] for x in out]:
+            continue
+        out.append((u, text or ""))
+    return out
+
+
+# ----------------------------------------------------------------------------------------------
+# careers pages and recruitment links on the company's own site (used by extract._careers)
+
+CAREERS_SEGMENT = re.compile(
+    r"(karriere|karrierer|career|careers|jobs?|jobb|jobber|ledige?-stillinger|ledig-stilling|ledige-jobber|stillinger|"
+    r"stilling-ledig|stillingsannonser|vacanc(?:y|ies)|vacant-positions|open-positions|job-openings|join-us|join-our-team|"
+    r"work-with-us|jobb(?:e)?-(?:hos|i|for|med)-[a-z0-9-]+|arbeid-(?:hos|i)-[a-z0-9-]+|bli-(?:en-)?av-oss|bli-med|"
+    r"bli-med-p[aå]-laget|rekruttering|recruitment|jobbmuligheter|karrieremuligheter)")
+CAREERS_WORDS = re.compile(r"karriere|career|jobb|\bjobs?\b|stilling|vacanc|rekrutt|ansett|kolleg|medarbeider|join|bli med|arbeid (?:i|hos)|"
+                           r"work (?:with|at|for)|arbeidsplass|søk|apply|hiring|open positions|openings", re.I)
+# what the quoted line must say (a search box's 'Søk' is not careers wording)
+CAREERS_SPAN_WORDS = re.compile(r"karriere|career|jobb|\bjobs?\b|stilling|vacanc|rekrutt|join (?:us|our)|bli med|arbeid (?:i|hos)|"
+                                r"work (?:with|at|for) us|open positions|current openings|we are hiring|vi ansetter", re.I)
+
+
+def careers_page_reason(page: sp.Page, who: Who, site_label: str) -> str | None:
+    """Why a crawled page is not this company's careers page, or None when it is."""
+    s = urlsplit(page.final_url)
+    if _label(s.hostname or "") != site_label:
+        return "another site"
+    segs = [re.sub(r"\.(html?|php|aspx?)$", "", x.lower()) for x in s.path.split("/") if x]
+    sub_career = bool(CAREER_HOST.match((s.hostname or "").lower()))
+    if not (sub_career and not segs) and not (segs and CAREERS_SEGMENT.fullmatch(segs[-1])):
+        return "path is not a careers page"  # 'utstilling', 'timebestilling', '4-hjulstilling', 'jobb-og-studie', 'kort-vei-til-jobb'
+    if NEWS_PATH.search(s.path):
+        return "a news article"
+    if not CAREERS_WORDS.search((page.title or "") + "\n" + (page.text or "")[:20000]):
+        return "no careers wording on the page"
+    tenants = {fold(m.group(1)) for _, t in page.links for m in [HOS.search(t or "")]
+               if m and AD_ANCHOR.search(t or "") is not None and not who.match(m.group(1)) and not NORWAY.search(fold(m.group(1)))}
+    if len(tenants) >= 2:
+        return "lists jobs at other businesses"  # a shopping centre's 'Ledige stillinger hos Floyd / Vila / Levi's'
+    named = [m.group(1).strip() for m in re.finditer(r"(?:^|\n)\s*(?:selskap|arbeidsgiver|employer|company)\s*:\s*\n?\s*([^\n]{2,80})",
+                                                     page.text or "", re.I)]
+    if named and 3 * sum(1 for x in named if not who.match(x)) >= 2 * len(named):
+        # aberia.no for ABERIA AS: the ads say 'Selskap: Aberia Omsorg & Assistanse AS' or 'Aberia Ung AS' (the group's companies)
+        return "lists jobs at another company"
+    return None
+
+
+def careers_span(page: sp.Page) -> str:
+    """Literal text that shows the page is a careers page: its title when that says so, else the first line that does."""
+    if page.title and CAREERS_SPAN_WORDS.search(page.title) and len(re.sub(r"[^a-z0-9]", "", fold(page.title))) >= 8:
+        return page.title
+    for line in (page.text or "").splitlines():
+        line = clip(line.strip(), 160)
+        if CAREERS_SPAN_WORDS.search(line) and len(re.sub(r"[^a-z0-9]", "", fold(line))) >= 8:
+            return line
+    return ""
+
+
+ACCOUNT_RX = [
+    ("teamtailor", re.compile(r"^https?://([a-z0-9-]+)\.teamtailor\.com", re.I)),
+    ("recman", re.compile(r"^https?://([a-z0-9-]+)\.recman\.(?:page|no|io)", re.I)),
+    ("easycruit", re.compile(r"^https?://([a-z0-9-]+)\.easycruit\.com", re.I)),
+    ("varbi", re.compile(r"^https?://([a-z0-9-]+)\.varbi\.com", re.I)),
+    ("recruitee", re.compile(r"^https?://([a-z0-9-]+)\.recruitee\.com", re.I)),
+    ("homerun", re.compile(r"^https?://([a-z0-9-]+)\.homerun\.co", re.I)),
+    ("personio", re.compile(r"^https?://([a-z0-9-]+)\.jobs\.personio\.(?:de|com)", re.I)),
+    ("lever", re.compile(r"^https?://jobs\.(?:eu\.)?lever\.co/([A-Za-z0-9._-]+)", re.I)),
+    ("greenhouse", re.compile(r"^https?://(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/([A-Za-z0-9_-]+)", re.I)),
+    ("smartrecruiters", re.compile(r"^https?://(?:jobs|careers)\.smartrecruiters\.com/([A-Za-z0-9_-]+)", re.I)),
+    ("workable", re.compile(r"^https?://apply\.workable\.com/([A-Za-z0-9_-]+)", re.I)),
+    ("hr-manager", re.compile(r"^https?://([a-z0-9-]+)\.hr-?manager\.(?:net|no)", re.I)),
+]
+
+
+def recruitment_account(url: str, who: Who, site_label: str, site_domain: str = "") -> str | None:
+    """The platform name when a link goes to this company's own recruitment account (or its own career site);
+    None for platform home pages, single ads, searches, log-in pages and accounts named after someone else (a group, a client)."""
+    from ..discovery import registrable
+    s = urlsplit(url)
+    host = (s.hostname or "").lower()
+    if re.search(r"login|log-in|signin|sign-in|register|registrer|password|passord|/auth\b|/account\b", s.path + "?" + s.query, re.I):
+        return None  # a candidate log-in or sign-up form is not a recruitment page
+    if CAREER_HOST.match(host) and _label(host) == site_label:
+        # the same registrable domain as the verified site: career.bonliva.se is not bonliva.no's
+        return "own career site" if not site_domain or registrable(host) == site_domain else None
+    names = {who.compact} | who.brands
+    for platform, rx in ACCOUNT_RX:
+        m = rx.match(url)
+        if not m:
+            continue
+        acct = re.sub(r"[^a-z0-9]", "", fold(m.group(1)))
+        if acct in SKIP_SUB or len(acct) < 3:
+            return None
+        if acct in names or any(len(n) >= 4 and acct.startswith(n) and re.fullmatch(r"(as|asa|norge|norway|no|jobs|karriere|career)?",
+                                                                                   acct[len(n):]) for n in names):
+            return platform
+        return None
+    return None
 
 
 def _list_links(pg: sp.Page, site_label: str) -> list[str]:
@@ -589,6 +773,7 @@ class Careers(Source):
         self.jobbnorge: dict | None = None
         self.stats = {"companies_checked": 0, "companies_with_targets": 0, "targets_read": 0, "companies_published": 0,
                       "postings_published": 0, "skipped_other_employer": 0, "skipped_duplicate": 0, "skipped_expired": 0,
+                      "skipped_evergreen": 0, "skipped_stale": 0, "skipped_open_application": 0,
                       "skipped_abroad": 0, "by_platform": {}, "not_read": {}}
 
     async def _get(self, ctx, url: str, **kw):
@@ -599,11 +784,13 @@ class Careers(Source):
         return await asyncio.shield(self.cache[key])
 
     async def enrich(self, ctx, p, ent, subunits, sites) -> None:
+        sites = [s for s in sites or [] if not getattr(s, "foreign_host", False)]  # another business's site: nothing from it
         if not sites:
             return
         p.checked_source("jobs", "recruitment pages linked from the verified website")
         self.stats["companies_checked"] += 1
-        who = Who(ent, subunits, p.orgnr)
+        brands = [_label(s.home.host()) for s in sites] + [s.home.site_name for s in sites if s.home.site_name]
+        who = Who(ent, subunits, p.orgnr, brands)
         found: list[tuple[Posting, dict, object]] = []  # posting, company-owned link, platform response
         # NAV postings are added first, so the same ad is not published twice
         nav_done = p.notes.setdefault("_nav_done", asyncio.Event()) if any(s.name == "nav_jobs" for s in ctx.sources) else None
@@ -632,6 +819,8 @@ class Careers(Source):
                 hrefs = "\n".join(u for u, _ in page.links)
                 self._add(targets, ads, hrefs, _via_page(page, f"link on {page.final_url}"))
                 for post in jsonld_postings(page):
+                    post.extra["on_careers"] = bool(CAREERS_PATH.search(urlsplit(page.final_url).path))
+                    post.extra["span"] = page_span(page.text + "\n" + json.dumps(page.jsonld, ensure_ascii=False), post.title)
                     found.append((post, _via_page(page, f"JobPosting JSON-LD on {page.final_url}"), None))
             # 2. careers pages again as raw HTML (iframes and widget scripts are not links), and a career subdomain
             careers = [pg.final_url for pg in site.pages[1:] if CAREERS_PATH.search(urlsplit(pg.final_url).path)][:2]
@@ -691,9 +880,13 @@ class Careers(Source):
               if feed.rstrip("/").endswith("/jobs.rss") and "teamtailor" in raw.lower()]
         self._add(targets, ads, raw, via, tt)
         for post in jsonld_postings(pg):
+            post.extra["on_careers"] = bool(CAREERS_PATH.search(urlsplit(pg.final_url).path))
+            post.extra["span"] = page_span(raw, post.title)
             found.append((post, _via_fetched(f, f"JobPosting JSON-LD on {f.final_url}"), f))
         for u, text in _children(pg, label):
             ads["site"].append((u, {"anchor": text, **_via_fetched(f, f"link '{clip(text, 60)}' on {f.final_url}")}))
+        for u, text in _anchor_ads(pg, label):  # an ad page outside the careers path must carry a strong ad marker
+            ads["site"].append((u, {"anchor": text, "under": False, **_via_fetched(f, f"link '{clip(text, 60)}' on {f.final_url}")}))
 
     async def _page(self, ctx, url: str):
         f = await ctx.client.get(self.name, url, timeout=REQ_TIMEOUT)
@@ -790,7 +983,7 @@ class Careers(Source):
             return
         f, pg = res
         if platform == "site":
-            post = own_site_ad(pg, via.get("anchor") or "", who)
+            post = own_site_ad(pg, via.get("anchor") or "", who, under_careers=via.get("under", True))
             if post:
                 found.append((post, via, f))
             return
@@ -843,16 +1036,25 @@ class Careers(Source):
             if not post.title or not post.url:
                 continue
             name = post.employer or post.extra.get("account") or ""
+            if post.platform == "site" and not name and post.extra.get("on_careers"):
+                name = post.employer = who.name  # JobPosting markup on the verified site's own careers page, naming no employer
             if post.orgnr and post.orgnr not in who.own:
                 self.stats["skipped_other_employer"] += 1
                 continue
             if not (post.orgnr in who.own if post.orgnr else False) and not who.match(name):
                 self.stats["skipped_other_employer"] += 1
                 continue
-            if post.platform != "site" and OPEN_APPLICATION.search(post.title):
+            if OPEN_APPLICATION.search(post.title):
+                self.stats["skipped_open_application"] += 1
                 continue
             if post.deadline and post.deadline < today:
                 self.stats["skipped_expired"] += 1
+                continue
+            if post.deadline and _days(post.deadline, today) > EVERGREEN_DAYS:
+                self.stats["skipped_evergreen"] += 1  # 'Lærling', due 2030-12-31: a standing page, not an open posting
+                continue
+            if not post.deadline and post.published and _days(today, post.published) > STALE_DAYS:
+                self.stats["skipped_stale"] += 1
                 continue
             if post.country and post.country not in ("NO", "NOR", "NORWAY", "NORGE"):
                 self.stats["skipped_abroad"] += 1
@@ -879,9 +1081,12 @@ class Careers(Source):
     def _claim(self, p, who: Who, post: Posting, via: dict, f) -> None:
         label = LABEL.get(post.platform, post.platform)
         account = post.extra.get("account") or ""
-        value = {"title": post.title, "url": post.url, "status": post.status, "employer": post.employer or account or None,
-                 "location": post.location or None, "published": post.published, "application_due": post.deadline,
-                 "source": label if post.platform != "site" else "company careers page", "platform": post.platform}
+        value = {"title": post.title, "url": post.url, "location": post.location or None, "deadline": post.deadline,
+                 "posted": post.published, "status": post.status,
+                 "source": label if post.platform != "site" else "company careers page",
+                 # kept for older readers of the envelope
+                 "employer": post.employer or account or None, "published": post.published, "application_due": post.deadline,
+                 "platform": post.platform}
         if post.deadline_text and not post.deadline:
             value["application_due_text"] = clip(post.deadline_text, 80)
         if account and account != value["employer"]:
@@ -892,11 +1097,15 @@ class Careers(Source):
         basis = (f"employer {post.employer}" if post.employer else f"account {account}") if not post.orgnr else f"orgnr {post.orgnr}"
         ev = []
         if f is not None and getattr(f, "final_url", "") != via.get("url"):
+            span = post.extra.get("span") or literal_span(f, [post.title, post.employer or account, post.deadline_text or post.deadline])
             ev.append(Evidence(f.url, "public_job_board" if post.platform != "site" else "company_owned", f.retrieved_at, f.sha256,
-                               f"{label}: {post.title} · {basis} · posted {post.published or 'n/a'} · due {post.deadline or 'n/a'}",
-                               f"{post.platform}_listing", final_url=f.final_url, http_status=f.status,
+                               span or f"{label}: {post.title} · {basis}", f"{post.platform}_listing", final_url=f.final_url,
+                               http_status=f.status,
                                source_name=label if post.platform != "site" else (urlsplit(f.final_url).hostname or "")))
-        ev.append(Evidence(via["url"], "company_owned", via.get("retrieved_at") or "", via.get("sha256") or "", via.get("span") or "",
+        own_span = via.get("span") or ""
+        if not ev and post.extra.get("span"):
+            own_span = post.extra["span"]  # JobPosting markup on the company's page: quote the posting itself
+        ev.append(Evidence(via["url"], "company_owned", via.get("retrieved_at") or "", via.get("sha256") or "", own_span,
                            "recruitment_link_on_verified_site" if ev else "jsonld_jobposting", final_url=via["url"],
                            http_status=via.get("status") or None, source_name=via.get("host") or ""))
         ident = f"{post.platform}:{post.id}" if post.platform != "site" else "site:" + post.id.lower().rstrip("/")
@@ -913,6 +1122,21 @@ class Careers(Source):
 
     def report(self) -> dict:
         return self.stats
+
+
+def literal_span(f, values: list) -> str:
+    """Pieces of a fetched listing quoted the way the response itself writes them (plain, HTML-escaped or JSON-escaped)."""
+    body = f.text() if callable(getattr(f, "text", None)) else (getattr(f, "body", b"") or b"").decode("utf-8", "replace")
+    pieces = []
+    for v in values:
+        if not v:
+            continue
+        v = str(v)
+        for form in (v, htmllib.escape(v, quote=False), json.dumps(v, ensure_ascii=False)[1:-1], json.dumps(v)[1:-1]):
+            if form and form in body:
+                pieces.append(form)
+                break
+    return " · ".join(dict.fromkeys(pieces))
 
 
 def _days(a: str, b: str) -> int:

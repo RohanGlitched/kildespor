@@ -64,3 +64,18 @@ def norm_phone(text: str) -> str:
 def clip(text: str, limit: int = 280) -> str:
     text = re.sub(r"\s+", " ", text or "").strip()
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def split_words(text: str, words: set[str]) -> list[str] | None:
+    """Split a run-together handle into known words (or short numbers), preferring fewer, longer words; None if it can't."""
+    best: list[list[str] | None] = [[]] + [None] * len(text)
+    for i in range(len(text)):
+        if best[i] is None:
+            continue
+        for j in range(i + 1, len(text) + 1):
+            piece = text[i:j]
+            if piece in words or (piece.isdigit() and len(piece) <= 4):
+                cand = best[i] + [piece]
+                if best[j] is None or len(cand) < len(best[j]):
+                    best[j] = cand
+    return best[-1]

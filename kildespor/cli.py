@@ -177,6 +177,8 @@ async def run(args: argparse.Namespace) -> int:
                     if not p.family_claims(fam):
                         p.mark(fam, "failed", f"unexpected error: {type(exc).__name__}")
             research_ms = int((time.monotonic() - c0) * 1000)
+            for src in ctx.sources:  # a run-wide index may stop at its soft cap once no company is still being researched
+                getattr(src, "research_done", lambda: None)()
         # late sources (the NAV job index) run after the research slot is released
         if "late_args" in p.notes:
             try:
@@ -222,11 +224,15 @@ async def run(args: argparse.Namespace) -> int:
         Path(previous_path).replace(hist / f"envelopes-{next(iter(previous.values()))['run']['run_id'] if previous else 'previous'}.jsonl")
     tmp.replace(out)
     report = make_report(results, orgs, run_id, started, t0, client, ctx)
+    if args.html:
+        from .viewer import entry_paths
+        report["viewer"] = entry_paths(Path(args.html))
     Path(args.report or out.parent / "run-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     if args.html:
         from .viewer import write_viewer
-        write_viewer(results, orgs, report, Path(args.html))
-    print(json.dumps({k: report[k] for k in ("run_id", "companies", "envelopes", "validation", "runtime_seconds")}, indent=2))
+        vp = write_viewer(results, orgs, report, Path(args.html))
+        print(f"results viewer: open {vp.get('open') or vp['viewer']} in a browser (works from disk, no server)", file=sys.stderr)
+    print(json.dumps({k: report[k] for k in ("run_id", "companies", "envelopes", "validation", "runtime_seconds", "viewer") if k in report}, indent=2))
     return 0 if report["validation"]["passed"] else 1
 
 
@@ -314,8 +320,8 @@ def main(argv: list[str] | None = None) -> int:
         rep_path = Path(args.report) if args.report else Path(args.envelopes).parent / "run-report.json"
         report = json.loads(rep_path.read_text(encoding="utf-8")) if rep_path.exists() else {}
         orgs = [e["organisation_number"] for e in envs]
-        write_viewer({e["organisation_number"]: e for e in envs}, orgs, report, Path(args.out))
-        print(f"viewer written to {args.out} ({len(orgs)} companies)")
+        vp = write_viewer({e["organisation_number"]: e for e in envs}, orgs, report, Path(args.out))
+        print(f"viewer written to {args.out} ({len(orgs)} companies); open {vp.get('open') or vp['viewer']}")
         return 0
     if args.cmd == "run":
         from .netfix import install

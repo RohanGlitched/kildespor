@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+  <title>Firma AS – Nyheter</title>
+  <link>https://firma.no/nyheter/</link>
+  <lastBuildDate>Fri, 13 Nov 2026 06:00:00 +0000</lastBuildDate>
+  <item>
+    <title><![CDATA[Firma AS åpner nytt verksted i Drammen]]></title>
+    <link>https://firma.no/nyheter/nytt-verksted-i-drammen/</link>
+    <pubDate>Tue, 08 Sep 2026 08:30:00 +0000</pubDate>
+  </item>
+  <item>
+    <title>Hello world!</title>
+    <link>https://firma.no/hello-world/</link>
+    <pubDate>Mon, 01 Jun 2020 08:30:00 +0000</pubDate>
+  </item>
+  <item>
+    <title>Sak uten publiseringsdato i feeden</title>
+    <link>https://firma.no/nyheter/uten-dato/</link>
+    <dc:date>2026-11-13T06:00:00Z</dc:date>
+  </item>
+  <item>
+    <title>Omtale av oss hos en samarbeidspartner</title>
+    <link>https://partner.no/omtale-av-firma/</link>
+    <pubDate>Wed, 05 Aug 2026 08:30:00 +0000</pubDate>
+  </item>
+  <item>
+    <title>Vi søker nye lærlinger til høsten 2026</title>
+    <link>https://firma.no/nyheter/vi-soker-laerlinger/</link>
+    <pubDate>Thu, 12 Mar 2026 10:00:00 +0100</pubDate>
+  </item>
+</channel>
+</rss>

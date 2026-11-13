@@ -9,10 +9,18 @@
   "legal_name": "NILLE AS",
   "run": {"run_id": "…", "started_at": "…Z", "completed_at": "…Z", "terminal_status": "completed"},
   "summary": {
-    "headline": "NILLE AS · Detaljhandel med bredt vareutvalg ellers",
+    // the one fact a buyer would want first, with its source in brackets
+    "headline": "Hiring now: 3 open positions (“Butikkmedarbeider”; “Lagermedarbeider”), latest posted 2026-11-02 (NAV job board).",
+    // a short brief: the lead fact, what the company does, how it is doing, what changed, what is still unknown;
+    // every sentence names its source in brackets
+    "text": "Hiring now: … (NAV job board). A large operating business in retail sale … Its own website (nille.no) says: “…”. …",
+    "lead_fact": {"text": "…", "claim_keys": ["jobs:job_posting:…"], "sources": [{"name": "NAV job board", "url": "https://…"}]},
+    "what_it_does": "…", "what_changed": "In the last 12 months: new general manager registered (2026-09-01).",
     "sentences": [{"topic": "financials", "text": "Latest filed accounts (2025): revenue NOK 1.8 bn (+6% on 2024) …",
-                   "claim_keys": ["financials:revenue:2025:SELSKAP", "…"]}],
-    "unknowns": ["contact"]
+                   "claim_keys": ["financials:revenue:2025:SELSKAP", "…"],
+                   "sources": [{"name": "Brønnøysund annual accounts", "url": "https://data.brreg.no/regnskapsregisteret/…"}]}],
+    "unknowns": ["contact"],
+    "unknowns_explained": [{"family": "reviews", "state": "not_available", "text": "no customer rating was found"}]
   },
   "sections": {                          // the seven required sections, each with a state
     "legal_identity_and_brand":   {"state": "available", "families": ["identity", "description"], "claim_keys": ["…"]},
@@ -71,7 +79,7 @@
 | `contact` | registered phone, mobile and e-mail; e-mail and phone on the verified site |
 | `social` | company-owned profiles (Facebook, Instagram, LinkedIn, YouTube, X, TikTok, …) |
 | `jobs` | job postings (NAV, site JobPosting, postings on recruitment platforms the verified site links: Teamtailor, Recman, ReachMee, Jobylon, Jobbnorge, Easycruit, …), careers pages, linked recruitment platforms |
-| `activity` | dated items: company news (feed, JSON-LD, news page), job ads published |
+| `activity` | dated items: `company_news` (a real, dated article on the verified site: `{title, url, published, source}`, from the site's WordPress API, RSS/Atom feed or article pages; the publish date, never an "updated" date; default "Hello world" posts, product, contact and category pages are rejected), `news_page` (the site's news section, when it links an article we published), register events, public contract awards, state aid, food inspections |
 | `description` | the registered purpose, the site's own description |
 
 ## States

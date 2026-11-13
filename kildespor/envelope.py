@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import synthesis
+from . import brief, synthesis
 from .claims import FAMILIES, Claim, Profile
 
 SECTIONS = [
@@ -44,10 +44,12 @@ def _first(claims: list[Claim], field: str) -> Claim | None:
     return next((c for c in claims if c.field == field), None)
 
 
-def summarise(p: Profile) -> dict[str, Any]:
-    """Short, sourced sentences. Each sentence lists the claim keys it rests on; nothing else is said."""
+def summarise(p: Profile, changes: list[dict] | None = None) -> dict[str, Any]:
+    """A buyer-first brief plus short, sourced sentences. Each sentence lists the claim keys and sources it rests on."""
     if p.notes.get("entity_missing"):
-        return {"headline": "Not found in the official register", "sentences": [], "unknowns": list(FAMILIES)}
+        return {"headline": "Not found in the official register",
+                "text": "This organisation number was not returned by the Brønnøysund register, so no facts could be tied to it.",
+                "sentences": [], "unknowns": list(FAMILIES)}
     by = {f: p.family_claims(f) for f in FAMILIES}
     s: list[dict[str, Any]] = []
     ident = by["identity"]
@@ -141,10 +143,12 @@ def summarise(p: Profile) -> dict[str, Any]:
         s.append({"topic": "activity", "text": f"Most recent dated activity ({top.effective_date}): {title}.", "claim_keys": [top.key]})
     s.extend(x for x in concl if x["topic"] == "recent_changes")
     unknown = [f for f in FAMILIES if not by[f]]
-    headline = (name.value if name else p.orgnr)
-    if ind:
-        headline += f" · {ind.value.split(' ', 1)[-1]}"
-    return {"headline": headline, "sentences": s, "unknowns": unknown, "unknowns_explained": synthesis.explained_unknowns(p)}
+    for x in s:
+        x["sources"] = brief.sources_for(p, x.get("claim_keys", []))
+    b = brief.brief(p, changes)
+    return {"headline": b["headline"], "text": b["text"], "lead_fact": b["lead_fact"], "what_it_does": b["what_it_does"],
+            "what_changed": b["what_changed"], "sentences": s, "unknowns": unknown,
+            "unknowns_explained": synthesis.explained_unknowns(p)}
 
 
 def family_states(p: Profile) -> list[dict[str, Any]]:
@@ -197,7 +201,7 @@ def build(p: Profile, *, run_id: str, started_at: str, completed_at: str, operat
         "status": status,
         "legal_name": ent.get("navn"),
         "run": {"run_id": run_id, "started_at": started_at, "completed_at": completed_at, "terminal_status": terminal},
-        "summary": summarise(p),
+        "summary": summarise(p, (changes or {}).get("events")),
         "sections": sections,
         "field_states": states,
         "claims": claims,

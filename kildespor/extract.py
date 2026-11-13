@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree as ET
 
 from . import siteparse as sp
@@ -12,7 +12,7 @@ from .claims import Claim, Evidence, Profile
 from .discovery import registrable
 from .http import Client
 from .site import SiteResult
-from .util import clip, fold, name_tokens, norm_phone
+from .util import clip, fold, name_tokens, norm_phone, split_words
 
 DATE_PATTERNS = [
     (re.compile(r"(?<!\d)(\d{1,2})\.\s?(\d{1,2})\.\s?(20\d{2})(?!\d)"), "dmy"),
@@ -83,22 +83,48 @@ def add_website(p: Profile, res: SiteResult) -> None:
                 key=f"website:official_website:{domain}"))
 
 
+FOREIGN_PHONE = re.compile(r"\+\s?(?:46|45|44|49|358|31|32|33|34|39|41|43|48|1)[\s\d()-]{6,}")
+
+
+def abroad(res: SiteResult, ent: dict) -> bool:
+    """A foreign group's site (krouli.com: a Swedish head office, +46 numbers) that never shows this Norwegian
+    company: its contacts, profiles, news and jobs are the group's."""
+    if res.home.host().endswith(".no") or any(pr.kind == "orgnr" for pr in res.proofs):
+        return False
+    text = "\n".join(f"{pg.title}\n{pg.text}" for pg in res.pages)
+    pc = (ent.get("forretningsadresse") or {}).get("postnummer")
+    no_phone = r"(?<![\w#])(?:\+|00)\s?47[\s.]?\d{2}[\s.]?\d{2}[\s.]?\d{2}[\s.]?\d{2}(?!\d)|\(\+47\)"
+    if re.search(no_phone, text) or (pc and re.search(rf"(?<!\d){pc}(?!\d)", text)):
+        return False
+    return bool(FOREIGN_PHONE.search(text))
+
+
 def add_site_claims(p: Profile, res: SiteResult, ent: dict) -> dict:
     """Contact, social, description, locations and hiring links from a verified site."""
-    out = {"socials": [], "feeds": [], "job_links": [], "news_pages": [], "hints": _identity_hints(ent, res)}
+    if abroad(res, ent):
+        res.foreign_host = True  # news, careers and profiles skip it too
+        p.notes["site_abroad"] = res.home.host()
+        return {"socials": [], "feeds": [], "job_links": [], "news_pages": [], "hints": set(), "ent": ent, "host": ""}
+    out = {"socials": [], "feeds": [], "job_links": [], "news_pages": [], "hints": _identity_hints(ent, res), "ent": ent,
+           "host": "" if getattr(res, "foreign_host", False) else res.home.host()}
     site_reg = registrable(res.home.host())
     reg_phones = {norm_phone(x) for x in (ent.get("telefon"), ent.get("mobil")) if x}
     # company-owned profiles: when a site links several profiles on one platform (client portfolios, partners,
     # template leftovers), keep only those whose handle resembles the company's name, domain or brand
     found: dict[str, dict[str, tuple]] = {}
-    for page in ([] if getattr(res, "foreign_host", False) else res.pages):
+    # a site that also prints another entity's organisation number, or says it is run on another's behalf
+    # (nemitek.no: "drives av NemiTek AS på vegne av" the trade association), carries that entity's profiles too
+    shared = bool(res.other_orgnrs) or any(re.search(r"p[aå] vegne av|on behalf of", f"{pg.text}", re.I) for pg in res.pages[:3])
+    if shared:
+        out["host"] = ""  # JSON-LD sameAs profiles are skipped too
+    for page in ([] if getattr(res, "foreign_host", False) or shared else res.pages):
         for platform, url, handle in sp.socials(page):
             found.setdefault(platform, {}).setdefault(url.lower().rstrip("/"), (platform, url, handle, page))
     hints = _identity_hints(ent, res)
     out["hints"] = hints
     for platform, items in found.items():
         host = res.home.host().removeprefix("www.")
-        keep = [(k, v) for k, v in items.items() if _resembles(v[2], hints)
+        keep = [(k, v) for k, v in items.items() if handle_matches(v[2], ent, host)
                 and not (len(v[2]) < len(host) and host.startswith(v[2].lower()) and "." in v[2])]
         for key, (platform, url, handle, page) in keep[:2]:
             out["socials"].append((platform, url, handle))
@@ -156,14 +182,76 @@ def _identity_hints(ent: dict, res: SiteResult) -> set[str]:
 FOREIGN_FORMS = re.compile(r"(?:^|[^a-z])(ltd|limited|gmbh|inc|llc|plc|ab|aps|oy|oyj|bv|srl|sas|sarl|corp)(?:[^a-z]|$)")
 
 
-def _resembles(handle: str, hints: set[str]) -> bool:
-    last = handle.split("?")[0].rstrip("/").split("/")[-1]
-    if last.endswith("-") or FOREIGN_FORMS.search(re.sub(r"([a-z])([A-Z])", r"\1 \2", last).lower()):
+HANDLE_GENERIC = {"as", "asa", "sa", "ba", "da", "ans", "enk", "nuf", "no", "com", "norge", "norway", "official", "offisiell", "the",
+                  "og", "and", "hq", "i", "pa", "by", "shop", "store", "butikk", "nettbutikk", "studio", "app"}
+CONNECTORS = {"og", "i", "and", "the", "of", "for", "av", "pa", "til", "med"}
+
+
+def handle_name(handle: str) -> str:
+    """The name part of a profile handle: 'pages/Roger-Aamodt/123' -> 'Roger-Aamodt', 'p/Fidi-Video-100063' -> 'Fidi-Video',
+    'company/roger-aamodt-bygg' -> 'roger-aamodt-bygg'."""
+    segs = [s for s in unquote(handle.split("?")[0]).strip("/").split("/") if s]
+    if not segs:
+        return ""
+    if segs[0].lower() == "pages" and len(segs) > 2 and segs[1].lower() == "category":
+        name = segs[-1]  # pages/category/<kind>/<Name-id>
+    elif segs[0].lower() in ("pages", "pg", "p", "company", "school", "showcase", "c", "user") and len(segs) > 1:
+        name = segs[1]
+    else:
+        name = segs[-1]
+    return re.sub(r"[-_.]?\d{6,}$", "", name.lstrip("@"))
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", fold(text))
+
+
+def _segments(rest: str, words: set[str]) -> bool:
+    """True when `rest` is a run of allowed words (or digits)."""
+    return split_words(rest, words) is not None
+
+
+def handle_cores(ent: dict, host: str) -> tuple[set[str], set[str]]:
+    """Name cores a company's own handle must carry, and the extra words a handle may add to a core."""
+    words = name_tokens(ent.get("navn", ""))
+    cores = {"".join(words), "".join(w for w in words if w not in CONNECTORS)}
+    # a run of two or more of its own name words ('naesstransport' for ASBJØRN NÆSS TRANSPORT AS); a sister company
+    # whose registered name is exactly that run is caught by the register check afterwards
+    for i in range(len(words)):
+        for j in range(i + 2, len(words) + 1):
+            run = [w for w in words[i:j] if w not in CONNECTORS]
+            if len(run) >= 2:
+                cores.add("".join(run))
+    label = _alnum((host or "").removeprefix("www.").split(".")[0])
+    if label:
+        cores.add(label)
+    place = set()
+    for key in ("forretningsadresse", "postadresse"):
+        a = ent.get(key) or {}
+        place |= set(name_tokens(a.get("kommune") or "")) | set(name_tokens(a.get("poststed") or ""))
+    allowed = set(words) | HANDLE_GENERIC | place
+    return {c for c in cores if len(c) >= 4}, allowed
+
+
+def handle_matches(handle: str, ent: dict, host: str) -> bool:
+    """A profile is the company's own only when its handle is the company's name or site name, optionally with the
+    company's own name words, its place, a legal form or a generic suffix. 'rogeraamodteiendom' on the site of
+    ROGER AAMODT BYGG AS fails: 'eiendom' names a sister company (ROGER AAMODT EIENDOM AS)."""
+    name = handle_name(handle)
+    if not name or name.endswith("-") or FOREIGN_FORMS.search(re.sub(r"([a-z])([A-Z])", r"\1 \2", name).lower()):
         return False  # truncated slug, or a handle naming a foreign company
-    h = re.sub(r"[^a-z0-9]", "", fold(last))
-    if any(len(x) > len(h) >= 4 and x.startswith(h) and x != h for x in hints if "." in x or len(x) > 8):
-        pass
-    return bool(h) and any(x in h or (len(h) >= 4 and h in x) for x in hints)
+    h = _alnum(name)
+    if len(h) < 3:
+        return False
+    cores, allowed = handle_cores(ent, host)
+    for c in cores:
+        if h == c:
+            return True
+        if h.startswith(c) and _segments(h[len(c):], allowed):
+            return True
+        if h.endswith(c) and _segments(h[: -len(c)], allowed):
+            return True
+    return False
 
 
 def _page_kind(page: sp.Page, res: SiteResult) -> str:
@@ -181,13 +269,15 @@ def _jsonld_org(p: Profile, page: sp.Page, node: dict, out: dict) -> None:
     same = node.get("sameAs") or []
     if isinstance(same, str):
         same = [same]
+    if not out.get("host"):
+        same = []  # the site forwards to another business's page: its profiles are that business's
     for s in same:
         if not isinstance(s, str):
             continue
         fake = sp.Page(url=page.url, final_url=page.final_url, links=[(s, "")])
         for platform, url, handle in sp.socials(fake):
-            if not _resembles(handle, out.get("hints", set())):
-                continue  # template leftovers: a sameAs that shares nothing with the company
+            if not handle_matches(handle, out.get("ent") or {}, out.get("host", "")):
+                continue  # template leftovers, or a sister company's profile
             p.add(Claim("social", "company_profile", {"platform": platform, "url": url, "handle": handle},
                         [_ev(page, f"JSON-LD sameAs: {s}", "jsonld_sameAs")], label=f"{platform.title()} profile",
                         confidence=0.96, key=f"social:company_profile:{url.lower().rstrip('/')}"))
@@ -209,38 +299,35 @@ def _jsonld_org(p: Profile, page: sp.Page, node: dict, out: dict) -> None:
 
 
 def _jsonld_job(p: Profile, page: sp.Page, node: dict) -> None:
-    title = node.get("title")
-    if not title:
-        return
-    posted = _iso(node.get("datePosted"))
-    loc = node.get("jobLocation")
-    city = ""
-    if isinstance(loc, list):
-        loc = loc[0] if loc else None
-    if isinstance(loc, dict):
-        a = loc.get("address") or {}
-        city = a.get("addressLocality", "") if isinstance(a, dict) else ""
-    v = {"title": clip(str(title), 160), "url": node.get("url") or page.final_url, "location": city,
-         "valid_through": _iso(node.get("validThrough")), "source": "company site JobPosting"}
-    p.add(Claim("jobs", "job_posting", v, [_ev(page, f"JobPosting: {title} datePosted {node.get('datePosted')}", "jsonld")],
-                label="Job posting", effective_date=posted, key=f"jobs:job_posting:{fold(str(title))[:80]}:{posted}"))
+    """JobPosting markup is published by the careers source (sources/careers.py), which checks the hiring organisation
+    against this company, skips postings past their deadline and open applications, and quotes the posting itself.
+    Publishing it here as well would skip those checks."""
+    return None
 
 
 def _jsonld_article(p: Profile, page: sp.Page, node: dict) -> None:
-    headline = node.get("headline") or node.get("name")
-    when = _iso(node.get("datePublished") or node.get("startDate") or node.get("dateCreated"))
-    if not headline or not when:
-        return
-    url = node.get("url") or node.get("mainEntityOfPage") or page.final_url
-    if isinstance(url, dict):
-        url = url.get("@id") or page.final_url
-    p.add(Claim("activity", "company_news", {"title": clip(str(headline), 200), "url": str(url), "source": "company site"},
-                [_ev(page, f"{node.get('@type')}: {headline} ({when})", "jsonld")], label="Company news",
-                effective_date=when, key=f"activity:company_news:{fold(str(headline))[:80]}"))
+    """Company news is built in news.py from article pages, feeds and the WordPress API: a home or contact page
+    marked up as an Article (often dated when the site was made) is not a news item."""
+    return None
+
+
+STREET_WORD = (r"^(?:vei|veien|veg|vegen|gate|gata|gaten|plass|plassen|vn\.?|gt\.?|allé|alle|brygge|bryggen|torget|"
+               r"stredet|bakken|svingen|tunet|ringen|haugen|lia|åsen|kaien|\d+[a-z]?)$")
+
+
+def _own_postcodes(p: Profile, ent: dict) -> set[str]:
+    """Postcodes of the registered business and postal address and of every registered workplace."""
+    codes = {(ent.get(k) or {}).get("postnummer") for k in ("forretningsadresse", "postadresse")}
+    for u in p.notes.get("subunits") or []:
+        codes |= set(re.findall(r"(?<!\d)\d{4}(?!\d)", str(u.get("address") or "")))
+    return {c for c in codes if c}
 
 
 def _postal_addresses(p: Profile, page: sp.Page, ent: dict) -> None:
+    own = _own_postcodes(p, ent)
     for m in list(sp.POSTCODE_RE.finditer(page.text))[:6]:
+        if m.group(1) not in own:
+            continue  # a chain or group site lists other businesses' shops: only the company's own places count
         line_start = page.text.rfind("\n", 0, m.start()) + 1
         line_end = page.text.find("\n", m.end())
         line = page.text[line_start: line_end if line_end > 0 else m.end() + 40].strip()
@@ -250,7 +337,14 @@ def _postal_addresses(p: Profile, page: sp.Page, ent: dict) -> None:
         street = street_rx.search(line) or street_rx.search(prev)
         if not street:
             continue
-        addr = f"{street.group(0).strip()}, {m.group(1)} {m.group(2)}"
+        prev2 = page.text[page.text.rfind("\n", 0, max(0, prev_start - 1)) + 1: prev_start]
+        if re.search(r"\bc\s*/\s*o\b|\bv/\s|\bpostboks\b", f"{prev2} {prev} {line}", re.I):
+            continue  # an address "care of" a manager, accountant or law firm is theirs, not the company's
+        words = street.group(0).split()
+        # "Gården har adresse Grinivegen 12" -> "Grinivegen 12": cut a lead-in up to its last lowercase word
+        # ("Kong Oscars gate 3" keeps its street word "gate")
+        cut = max((i for i, w in enumerate(words[:-1]) if w.islower() and not re.search(STREET_WORD, w)), default=-1)
+        addr = f"{' '.join(words[cut + 1:])}, {m.group(1)} {m.group(2)}"
         if len(addr) > 90:
             continue
         p.add(Claim("locations", "address_on_site", addr, [_ev(page, clip(prev + ' ' + line, 200), "address_pattern")],
@@ -273,81 +367,33 @@ def _description(p: Profile, res: SiteResult) -> None:
 
 
 def _careers(p: Profile, res: SiteResult, out: dict) -> None:
-    for page in res.pages[1:]:
-        if re.search(r"karriere|career|jobb|jobs|stilling|vacanc", page.final_url, re.I):
+    """The company's own careers page and its own recruitment account, from a verified site that is the company's own.
+    A careers page must have a careers path ('karriere', 'ledige-stillinger', 'jobb-hos-oss', ...; never 'utstilling',
+    'timebestilling' or 'kort-vei-til-jobb'), careers wording, and must not list jobs at other businesses."""
+    from .sources.careers import Who, _label, careers_page_reason, careers_span, recruitment_account
+    if getattr(res, "foreign_host", False):
+        return  # the domain forwards to another business's site
+    ent = p.notes.get("entity") or {}
+    label = _label(res.home.host())
+    who = Who(ent, p.notes.get("subunits") or [], p.orgnr, [label] + ([res.home.site_name] if res.home.site_name else []))
+    pages = [pg for pg in res.pages[1:] if careers_page_reason(pg, who, label) is None]
+    pages.sort(key=lambda pg: urlsplit(pg.final_url).path.count("/"))
+    for page in pages:
+        span = careers_span(page)
+        if span:
             p.add(Claim("jobs", "careers_page", {"url": page.final_url, "title": clip(page.title, 140)},
-                        [_ev(page, page.title or page.final_url, "careers_page")], label="Careers page", confidence=0.92,
+                        [_ev(page, span, "careers_page")], label="Careers page", confidence=0.92,
                         key=f"jobs:careers_page:{page.final_url.lower().rstrip('/')}"))
             break
-    for u, text, page in out["job_links"][:3]:
-        host = urlsplit(u).hostname or ""
-        p.add(Claim("jobs", "recruitment_channel", {"url": u, "platform": registrable(host), "text": clip(text, 80)},
-                    [_ev(page, f"link to {u} ({text})", "outbound_link")], label="Recruitment page linked from the site",
-                    confidence=0.9, key=f"jobs:recruitment_channel:{u.lower()}"))
-
-
-async def add_feed_items(client: Client, p: Profile, res: SiteResult, feeds: list[str], ent: dict, limit: int = 12) -> int:
-    """Dated news items from the company's own RSS/Atom feed."""
-    site_reg = registrable(res.home.host())
-    tried = 0
-    added = 0
-    candidates = [f for f in feeds if registrable(urlsplit(f).hostname or "") == site_reg and "comments" not in f.lower()]
-    if not candidates and "wordpress" in (res.home.generator or "").lower():
-        candidates = [res.home.final_url.rstrip("/") + "/feed/"]
-    for feed in candidates[:2]:
-        tried += 1
-        f = await client.get("website_feed", feed, max_body=1_500_000)
-        if not f.ok:
-            continue
-        try:
-            root = ET.fromstring(f.body)
-        except ET.ParseError:
-            continue
-        items = root.findall(".//item") or root.findall(".//{http://www.w3.org/2005/Atom}entry")
-        for it in items[:limit]:
-            def g(tag: str) -> str:
-                el = it.find(tag)
-                if el is None:
-                    el = it.find("{http://www.w3.org/2005/Atom}" + tag)
-                if el is None:
-                    return ""
-                return (el.text or el.attrib.get("href") or "").strip()
-            title = g("title")
-            link = g("link")
-            when = _iso(g("pubDate") or g("published") or g("updated"))
-            if not title or not when:
+    seen: set[str] = set()
+    for page in res.pages:
+        for u, text in page.links:
+            platform = recruitment_account(u, who, label, registrable(res.home.host()))
+            key = u.lower().split("#")[0].rstrip("/")
+            account = urlsplit(key).hostname or key  # one link per recruitment account
+            if not platform or account in seen or len(seen) >= 2:
                 continue
-            ev = Evidence(feed, "company_owned", f.retrieved_at, f.sha256, f"{title} — {when}", "rss_item",
-                          final_url=f.final_url, http_status=f.status, source_name=urlsplit(feed).hostname or "")
-            if p.add(Claim("activity", "company_news", {"title": clip(title, 200), "url": link or feed, "source": "company feed"},
-                           [ev], label="Company news", effective_date=when, key=f"activity:company_news:{fold(title)[:80]}")):
-                added += 1
-        if added:
-            break
-    return added
-
-
-def news_from_pages(p: Profile, res: SiteResult, limit: int = 10) -> int:
-    """Dated headlines from news/blog listing pages (link text next to a date)."""
-    added = 0
-    for page in res.pages[1:]:
-        if not re.search(r"nyhet|news|aktuelt|blogg|blog|presse|artikl|siste", page.final_url, re.I):
-            continue
-        lines = page.text.split("\n")
-        link_by_text = {t.strip().lower(): u for u, t in page.links if t and len(t) > 15}
-        for i, line in enumerate(lines):
-            d = _parse_date(line)
-            if not d or d.year < 2015 or d > date.today():
-                continue
-            window = [x.strip() for x in lines[max(0, i - 2): i + 3] if x.strip()]
-            title = next((w for w in window if w.lower() in link_by_text and len(w) > 15), None)
-            if not title:
-                continue
-            p.add(Claim("activity", "company_news", {"title": clip(title, 200), "url": link_by_text[title.lower()],
-                                                      "source": "company news page"},
-                        [_ev(page, f"{title} {line.strip()}", "news_listing_date")], label="Company news",
-                        effective_date=d.isoformat(), confidence=0.85, key=f"activity:company_news:{fold(title)[:80]}"))
-            added += 1
-            if added >= limit:
-                return added
-    return added
+            seen.add(account)
+            p.add(Claim("jobs", "recruitment_channel", {"url": u, "platform": platform, "text": clip(text, 80)},
+                        [_ev(page, f"link to {u} ({text})", "outbound_link")], label="Recruitment page linked from the site",
+                        confidence=0.9, key=f"jobs:recruitment_channel:{key}"))

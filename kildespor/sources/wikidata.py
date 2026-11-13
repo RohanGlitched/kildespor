@@ -44,6 +44,7 @@ class Wikidata(Source):
         self.rows: dict[str, list[dict]] = {}
         self.meta: dict[str, dict] = {}
         self.matched = 0
+        self.dropped: list[str] = []
 
     async def prepare(self, ctx, orgs: list[str]) -> None:
         for i in range(0, len(orgs), 1200):
@@ -105,11 +106,22 @@ class Wikidata(Source):
             fam, kind = PROPS[prop]
             span = f"{qid} {prop}: {shown}"
             if fam == "social":
+                from ..extract import handle_matches
+                if not handle_matches(raw, ent or {}, ""):
+                    # Wikidata items are edited by anyone: a foundation registered c/o a law firm carried the firm's
+                    # handles. A handle must carry the company's own name, as on a company site.
+                    self.dropped.append(f"{p.orgnr} {kind} {raw}")
+                    continue
                 url = URL[kind].format(raw)
                 p.add(Claim("social", "company_profile", {"platform": kind, "url": url, "handle": raw}, ev(span),
                             label=f"{kind.title() if kind != 'x' else 'X'} profile", confidence=0.95,
                             key=f"social:company_profile:{url.lower().rstrip('/')}"))
             elif fam == "website":
+                from ..extract import handle_matches
+                label = raw.split("//")[-1].split("/")[0].removeprefix("www.").split(".")[0]
+                if not handle_matches(label, ent or {}, ""):
+                    self.dropped.append(f"{p.orgnr} website {raw}")
+                    continue
                 p.add(Claim("website", "website_listed_in_wikidata", raw, ev(span), label="Website listed in Wikidata",
                             confidence=0.9))
             elif kind == "headquarters":
@@ -128,4 +140,5 @@ class Wikidata(Source):
         return [b["value"]["value"] for b in self.rows.get(orgnr, []) if b.get("prop", {}).get("value", "").endswith("/P856")]
 
     def report(self) -> dict:
-        return {"companies_with_items": len(self.rows), "matched": self.matched}
+        return {"companies_with_items": len(self.rows), "matched": self.matched,
+                "dropped_not_named_like_the_company": len(self.dropped), "dropped_examples": self.dropped[:10]}

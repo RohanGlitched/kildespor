@@ -3,6 +3,10 @@
 **Norwegian company research where every fact is tied to the exact organisation number.**
 *Kildespor* is Norwegian for "source trail": every fact keeps the trail back to the record or page it came from.
 
+**See the results: https://rohanglitched.github.io/kildespor/** (hosted viewer of a real run: search,
+filter, compare companies side by side, open the source behind every fact; desktop and phone).
+After your own run, **open `out/index.html`** in any browser: the same viewer, straight from disk, no server.
+
 Give it a batch of organisation numbers. For each one it returns a profile built from the official
 registers (Brønnøysund entity, roles, workplaces, accounts, update log, state aid), the company's own
 verified website, NAV's job feed, Mattilsynet inspections, EU procurement awards, Finanstilsynet and
@@ -18,12 +22,31 @@ That writes:
 
 | File | What it is |
 |---|---|
+| **`out/index.html`** | **the results viewer: open it in a browser** (double-click; works from disk, no server, no network) |
+| `out/README.txt` | what each file is, and "open index.html" |
 | `out/envelopes.jsonl` | one terminal envelope per input, in input order ([schema](DATA_SCHEMA.md)) |
-| `out/run-report.json` | counts, coverage by field family, validation checks, requests, p50/p95, cost |
-| `out/viewer/index.html` | a static viewer: search, filter, compare, open every source (works from disk) |
+| `out/run-report.json` | counts, coverage by field family, validation checks, requests, p50/p95, cost; `viewer.open` is the viewer's path |
+| `out/viewer/` | the viewer's files and one small data file per company (loaded on demand, so 1,000+ companies stay fast) |
 | `out/snapshots.zip` | every response behind a published fact, one entry per SHA-256 |
 | `out/history/` | the previous run's envelopes after a refresh |
 | `out/.kildespor-cache/` | declared cache: NAV ad id → employer organisation number (an ad's employer never changes), so a refresh fetches only new ads |
+
+### Viewing results
+
+Every verifiable thing in the viewer carries a red **T**, like the painted marks on Norwegian hiking trails.
+Select it and the fact's *source trail* opens beside the page: the fact, the exact words it rests on, the fetched
+document (URL, retrieval time, HTTP status, SHA-256 of the bytes) and the source it came from, joined by a drawn line.
+
+- **Find**: one search box for name, organisation number, website, place or industry; filters for website, hiring,
+  company news, social profiles and changes; place shortcuts; sort by revenue, result, employees, latest news or open jobs.
+- **Compare**: tick two to four companies, open *Compare* for suggested pairs, or use *Side by side with* on any
+  profile: summary, accounts, size, website, social profiles, open jobs, news and unknowns in columns. The link can be shared.
+- **Verify**: a profile opens with the summary headline and brief, each sentence with its trail, then key figures,
+  company news, open jobs and social profiles, and what could not be confirmed and why.
+- Phones get the same views with tabs at the bottom and the trail as a sheet. Keyboard: `/` to search, arrows to move,
+  `c` to add to compare, `Esc` to close a trail. Light and dark themes; motion is off when the system asks for less.
+
+To rebuild the viewer from an envelopes file: `python -m kildespor view --envelopes out/envelopes.jsonl --out out/viewer`.
 
 Running the same command again with the same output directory is a **refresh**: every fact is
 matched to the previous run by a stable key, changes are reported with evidence for both sides,
@@ -31,7 +54,7 @@ and facts whose source failed this time are kept, marked as carried forward.
 
 ## Results
 
-**Live viewer of the 100-company smoke test: https://rohanglitched.github.io/kildespor/**
+**Live viewer: https://rohanglitched.github.io/kildespor/**
 (search, filter, compare, open the source behind every fact; works on phones).
 
 The smoke test is the public universe sampled with Builderr's own `select_entry_batch.py` at its default
@@ -117,16 +140,25 @@ The input may be JSONL (`{"organisation_number": "…"}` per line), a JSON array
    whose copyright or data-controller line names another company, that is placed in another town, or whose
    brand is the registered name of a sister company is rejected. Sites drawn in JavaScript are read from
    their page data and script bundles. Details: [IDENTITY_RESOLUTION.md](IDENTITY_RESOLUTION.md).
-4. **Read the proven site** for company-owned profiles, contact details, addresses, careers pages,
-   recruitment platforms, JobPosting data and dated news (RSS/Atom, JSON-LD, news listings).
-5. **Hiring.** Every active ad in NAV's job feed is indexed by its employer organisation number;
-   an ad is published when that number is the company's or one of its registered workplaces'. The
-   recruitment platforms the proven site links (Teamtailor, Recman, ReachMee, Jobylon, Jobbnorge,
-   Easycruit, or the site's own careers page) add postings whose employer is the company itself.
-6. **Summarise** what kind of company it is in plain English, then sourced conclusions with their
-   formula (revenue trend, operating margin, equity ratio, cash against debt, a turn to profit or loss,
-   register warnings, register events in the last 12 months), and why each unknown is unknown. Every
-   sentence cites the facts it rests on.
+4. **Read the proven site** for company-owned profiles, contact details, addresses and careers pages.
+   A profile is published only when its handle is the company's own name or site name (optionally with
+   its own name words, its town, a legal form or a generic suffix), and no other active entity in the
+   register carries that name: `rogeraamodteiendom` on ROGER AAMODT BYGG AS's site is a sister company's.
+5. **Company news.** Real, dated articles from the proven site: its WordPress API, its RSS/Atom feed or
+   its article pages, using the publish date (never an "updated" date) and checking that the article page
+   shows readers that date. Default "Hello world" posts, product, project, contact, category and tag pages,
+   and template feeds that give every item one date are rejected.
+6. **Hiring.** Every readable active ad in NAV's job feed (180 days back) is indexed by its employer
+   organisation number; an ad is published when that number is the company's or one of its registered
+   workplaces', the ad page names that employer, and the ad is still open. Postings on the proven site's
+   careers pages and on the recruitment platforms it links (Teamtailor, Recman, ReachMee, Jobylon,
+   Jobbnorge, Easycruit, Webcruiter, …) are published only when the page is an open posting for this
+   company: open applications, service pages, closed ads and a sister company's ads are rejected.
+7. **Summarise for a buyer.** The summary opens with the one fact a buyer would want first (a risk flag,
+   open positions, a large revenue swing, a turn to profit or loss, recent news, a leadership change, or
+   size and margin), with its source in brackets. A short brief follows: what the company does, how it is
+   doing (with the formula behind each figure), what changed in the last 12 months, and what was checked
+   but not found and why. Every sentence names its source and lists the facts it rests on.
 
 Sources and their terms: [SOURCES.md](SOURCES.md).
 

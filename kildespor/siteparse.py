@@ -189,9 +189,12 @@ def valid_orgnr(num: str) -> bool:
 
 def emails(page: Page) -> list[str]:
     found = []
-    for href, _ in page.links:
+    for href, anchor in page.links:
         if href.lower().startswith("mailto:"):
             e = unquote(href[7:].split("?")[0]).strip().lower()
+            shown = EMAIL_RE.findall(anchor or "")
+            if shown and e not in (x.lower() for x in shown):
+                continue  # the link shows a different address: a stale mailto left behind a staff card
             if EMAIL_RE.fullmatch(e):
                 found.append(e)
     for e in EMAIL_RE.findall(page.text):

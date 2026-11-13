@@ -3,62 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kildespor</title>
-<meta name="description" content="Norwegian company profiles where every fact links to its source.">
+<title>Kildespor company profiles</title>
+<meta name="description" content="Norwegian company profiles where every fact leads back to its source.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f3f4f2" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0d1318" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23173f63'/%3E%3Cpath d='M8 23 L15 16 L20 19 L25 9' stroke='%23fff' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='25' cy='9' r='3' fill='%23f6d55c'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#f2f4f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1a21" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8102e'/%3E%3Cpath d='M8 9h16M16 9v15' stroke='%23fff' stroke-width='4.5' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>try{var t=localStorage.getItem("ks-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-view="home">
 <a class="skip" href="#main">Skip to content</a>
-<header class="top">
-  <a class="brand" href="#/" aria-label="Kildespor, all companies">
-    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6"/><path d="M8 23 L15 16 L20 19 L25 9"/><circle cx="25" cy="9" r="3"/></svg>
-    <span class="bn">Kildespor</span><span class="bt">Norwegian company research, every fact sourced</span>
+<header class="topbar">
+  <a class="brand" href="#/" aria-label="Kildespor, start">
+    <svg class="tmark big" viewBox="0 0 24 20" aria-hidden="true"><rect width="24" height="20" rx="4"/><path d="M6 6h12M12 6v9"/></svg>
+    <span class="bn">Kildespor</span>
+    <span class="bt">every fact leads back to its source</span>
   </a>
-  <nav class="topnav" aria-label="Views">
-    <a href="#/" class="tn-list" data-nav="list">Companies</a>
-    <a href="#/run" data-nav="run"><span class="lg">Run o</span><span class="sm-o">O</span>verview</a>
+  <nav class="tabs" aria-label="Views">
+    <a href="#/" data-nav="find"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><span>Find</span></a>
+    <a href="#/compare/" data-nav="compare"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="7" height="14" rx="1.5"/><rect x="13.5" y="5" width="7" height="14" rx="1.5"/></svg><span>Compare</span><b class="ncmp" id="ncmp" hidden></b></a>
+    <a href="#/run" data-nav="run"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Run</span></a>
   </nav>
-  <button class="iconbtn theme" id="theme" type="button" aria-label="Switch colour theme" title="Switch light / dark">
+  <button class="iconbtn theme" id="theme" type="button" aria-label="Switch between light and dark">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path class="sun" d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
   </button>
 </header>
-<div class="app" id="app">
-  <aside class="list" id="list" aria-label="Find companies">
-    <div class="controls">
-      <div class="searchwrap">
-        <label class="sr" for="q">Search companies</label>
-        <svg class="sicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
-        <input id="q" class="search" type="search" placeholder="Name, org.nr, website, place, industry" autocomplete="off" spellcheck="false" enterkeyhint="search">
-        <kbd class="kbd" aria-hidden="true">/</kbd>
+<div class="shell" id="shell">
+  <aside class="find" id="find" aria-label="Find companies">
+    <div class="fhead">
+      <p class="intro">Every fact here has a red <svg class="tmark" viewBox="0 0 24 20" aria-hidden="true"><rect width="24" height="20" rx="4"/><path d="M6 6h12M12 6v9"/></svg><span class="sr">T</span>. Tap it to follow the fact back to the document it came from.</p>
+      <div class="sbox">
+        <label class="sr" for="q">Find a company</label>
+        <svg class="sic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+        <input id="q" type="search" placeholder="Name, org.nr, website, place or industry" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <kbd aria-hidden="true">/</kbd>
       </div>
-      <div class="filters" role="group" aria-label="Quick filters">
-        <button type="button" class="chip" data-f="site" aria-pressed="false">Verified site</button>
-        <button type="button" class="chip" data-f="jobs" aria-pressed="false">Hiring now</button>
-        <button type="button" class="chip" data-f="social" aria-pressed="false">Profiles</button>
-        <button type="button" class="chip" data-f="changed" aria-pressed="false">Changed</button>
+      <div class="chips" role="group" aria-label="Show only companies with">
+        <button type="button" class="chip" data-f="site" aria-pressed="false">Website<span></span></button>
+        <button type="button" class="chip" data-f="jobs" aria-pressed="false">Hiring<span></span></button>
+        <button type="button" class="chip" data-f="news" aria-pressed="false">News<span></span></button>
+        <button type="button" class="chip" data-f="social" aria-pressed="false">Social<span></span></button>
+        <button type="button" class="chip" data-f="changed" aria-pressed="false">Changed<span></span></button>
       </div>
-      <details class="more" id="morefilters">
-        <summary>Filter by availability state <span class="mf-on" id="mfon"></span></summary>
-        <div class="mf">
-          <label>Information type<select id="ffam"></select></label>
-          <label>State<select id="fst"></select></label>
-        </div>
-      </details>
-      <div class="listmeta">
+      <div class="places" id="places" role="group" aria-label="Place"></div>
+      <div class="fmeta">
         <span id="count" aria-live="polite"></span>
-        <button type="button" class="linkbtn" id="reset" hidden>Reset</button>
-        <label class="sortl">Sort
+        <button type="button" class="lb" id="reset" hidden>Clear</button>
+        <label class="sortl"><span class="sr">Sort by</span>
           <select id="sort">
             <option value="facts">Most facts</option>
             <option value="revenue">Revenue</option>
             <option value="result">Annual result</option>
+            <option value="emp">Employees</option>
+            <option value="news">Latest news</option>
+            <option value="jobs">Open jobs</option>
             <option value="name">Name A–Å</option>
-            <option value="recent">Recent activity</option>
             <option value="changes">Changes</option>
           </select>
         </label>
@@ -67,29 +67,18 @@
     <ul class="rows" id="rows" aria-label="Companies"></ul>
   </aside>
   <main class="main" id="main" tabindex="-1"></main>
-</div>
-<div class="tray" id="tray" hidden>
-  <div class="tray-in">
-    <span class="tray-l">Compare</span>
-    <ul class="tray-items" id="trayitems"></ul>
-    <div class="tray-act">
-      <button type="button" class="linkbtn inv" id="trayclear">Clear</button>
-      <a class="btn inv" id="traygo" href="#/">Compare</a>
+  <aside class="trail" id="trail" aria-label="Source trail" hidden>
+    <div class="trail-in" role="dialog" aria-labelledby="ttitle" tabindex="-1">
+      <header class="thead">
+        <div><p class="tkind" id="tkind">Source trail</p><h2 id="ttitle"></h2></div>
+        <button type="button" class="iconbtn" data-close aria-label="Close the source trail"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </header>
+      <div class="tbody" id="tbody"></div>
     </div>
-  </div>
+  </aside>
 </div>
-<div class="drawer" id="drawer" hidden>
-  <div class="scrim" data-close></div>
-  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dtitle" tabindex="-1">
-    <div class="dhead">
-      <div><div class="eyebrow" id="deyebrow">Evidence</div><h2 id="dtitle">Evidence</h2></div>
-      <button type="button" class="iconbtn" data-close aria-label="Close evidence">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-      </button>
-    </div>
-    <div class="dbody" id="dbody"></div>
-  </div>
-</div>
+<div class="scrim" id="scrim" data-close hidden></div>
+<svg class="thread" id="thread" aria-hidden="true"><path id="threadp"/></svg>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="data/index.js"></script>
 <script src="app.js"></script>

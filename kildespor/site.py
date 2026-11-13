@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from . import siteparse as sp
 from .discovery import Candidate, registrable
 from .http import Client
-from .util import LEGAL_FORMS, fold, name_tokens, norm_phone
+from .util import LEGAL_FORMS, fold, name_tokens, norm_phone, split_words
 
 MAX_PAGES = 9
 
@@ -609,19 +609,26 @@ async def sibling_check(client: Client, res: SiteResult, ent: dict, orgnr: str, 
     own_muni = fold(((ent.get("forretningsadresse") or ent.get("postadresse") or {}).get("kommune")) or "")
     own = {orgnr} | {u.get("organisation_number") for u in subunits}
     stems: list[str] = []
+    own_toks = name_tokens(ent.get("navn", ""))
     label = res.domain.split(".")[0]
     if label and label != res.domain:
+        # "ryfylkebygg" is searched as "ryfylke bygg": the register's name search needs the words apart
+        parts_ = split_words(fold(label).replace("-", ""), set(own_toks))
+        if parts_ and len(parts_) >= 2:
+            stems.append(" ".join(parts_))
         stems.append(label.replace("-", " "))
     for page in res.pages[:1]:
         # the brand is the title part that is not a page word ("Hjem - Driftstorget" is Driftstorget's home page)
         parts = [x for x in re.split(r"\s+[|–—-]\s+|\s*\|\s*", page.title or "") if x.strip()]
         brand = next((x for x in parts if fold(x.strip()) not in PAGE_WORDS), "")
+        brand = re.sub(r"^\s*(velkommen til|welcome to|hjem\s*[-–]?)\s+", "", brand or "", flags=re.I)
         for x in (page.site_name, brand):
             core = " ".join(name_tokens(x or ""))
             if core and len(core) >= 4 and core not in PAGE_WORDS:
                 stems.append(core)
-    own_core = " ".join(name_tokens(ent.get("navn", "")))
+    own_core = " ".join(own_toks)
     squash = lambda s: re.sub(r"[^a-z0-9]", "", s)  # noqa: E731  "G-TEK" and "GTEK" are one brand
+    own_street = fold(" ".join((ent.get("forretningsadresse") or {}).get("adresse") or []))
     for stem in dict.fromkeys(stems):
         if " ".join(name_tokens(stem)) == own_core or squash(stem) == squash(own_core):
             continue
@@ -637,6 +644,24 @@ async def sibling_check(client: Client, res: SiteResult, ent: dict, orgnr: str, 
             if r.get("organisasjonsnummer") in own or r.get("slettedato") or r.get("konkurs"):
                 continue
             other_core = " ".join(name_tokens(r.get("navn", "")))
+            # another entity declared this very domain as its website (RYFYLKE-BYGG AS for ryfylkebygg.no)
+            their_site = re.sub(r"^(https?://)?(www\.)?", "", (r.get("hjemmeside") or "").lower()).split("/")[0]
+            if their_site and their_site == res.domain.removeprefix("www.") and not res.candidate.declared:
+                res.status = "other_entity"
+                res.reason = f"{r.get('navn')} ({r.get('organisasjonsnummer')}) declares {their_site} as its website"
+                res.other_orgnrs = [r.get("organisasjonsnummer")]
+                return res
+            # sister companies at our own registered address whose names carry the site's brand (VOLT HARVEST I, II,
+            # III and GROUP at one address): name and address on the site cannot tell which of them it belongs to
+            their_street = fold(" ".join((r.get("forretningsadresse") or {}).get("adresse") or []))
+            stem_core = " ".join(name_tokens(stem))
+            if (own_street and their_street == own_street and stem_core and len(stem_core) >= 4
+                    and f" {stem_core} " in f" {other_core} " and not res.candidate.declared):
+                res.status = "ambiguous"
+                res.reason = (f"{r.get('navn')} ({r.get('organisasjonsnummer')}) shares our registered address and the "
+                              f"brand '{stem}'; without the organisation number on the site it is not certain whose site it is")
+                res.other_orgnrs = [r.get("organisasjonsnummer")]
+                return res
             if other_core and other_core == " ".join(name_tokens(stem)):
                 other_muni = fold(((r.get("forretningsadresse") or r.get("postadresse") or {}).get("kommune")) or "")
                 if named_on_site and own_muni and other_muni and other_muni != own_muni:

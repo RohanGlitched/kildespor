@@ -115,11 +115,10 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         extract.add_website(p, res)
         found = extract.add_site_claims(p, res, ent)
         try:
-            n = await extract.add_feed_items(ctx.client, p, res, found["feeds"], ent)
-            if not n:
-                extract.news_from_pages(p, res)
-        except Exception as exc:  # a broken feed never breaks the profile
-            p.error("website_feed", repr(exc))
+            from . import news
+            await news.add_company_news(ctx.client, p, res, trace)
+        except Exception as exc:  # a broken feed or article never breaks the profile
+            p.error("website_news", repr(exc))
     if not exact:
         statuses = {s["status"] for s in trace["sites"]}
         # only a site the entity declared makes the website "blocked"; a guessed domain that refuses crawlers
@@ -134,15 +133,16 @@ async def research(ctx: Context, orgnr: str, p: Profile | None = None, trace: di
         p.checked_source(fam, "verified company website" if exact else "no verified website")
 
     trace["t_website_ms"] = int((time.monotonic() - t0) * 1000)
-    if exact:
-        await prune_sibling_handles(ctx, p, ent, orgnr, subunits)
-        trace["dropped_handles"] = p.notes.get("dropped_handles", [])
     trace["t_website_done_ms"] = int((time.monotonic() - t0) * 1000)
     try:
         await connector_task
     except asyncio.CancelledError:
         connector_task.cancel()
         raise
+    # after every early source (Wikidata adds profiles too): a handle that is another active entity's name goes
+    if p.family_claims("social"):
+        await prune_sibling_handles(ctx, p, ent, orgnr, subunits)
+        trace["dropped_handles"] = p.notes.get("dropped_handles", [])
     p.notes["late_args"] = (ent, subunits, exact, cands, orgnr)
     trace["runtime_ms"] = int((time.monotonic() - t0) * 1000)
     return p, trace
@@ -153,14 +153,26 @@ async def prune_sibling_handles(ctx: Context, p: Profile, ent: dict, orgnr: str,
     from urllib.parse import quote
     import json as _json
     from .util import name_tokens
+    from .extract import _alnum, handle_name, split_words
     own = {orgnr} | {u.get("organisation_number") for u in subunits}
     own_core = " ".join(name_tokens(ent.get("navn", "")))
+    vocab: dict[str, str] = {}  # folded word -> the word as registered (Brreg's search needs ø/æ/å)
+    for raw in [ent.get("navn", "")] + [(ent.get(k) or {}).get(f) or "" for k in ("forretningsadresse", "postadresse")
+                                        for f in ("kommune", "poststed")]:
+        for w in re.findall(r"[^\W_]+", raw.lower()):
+            vocab.setdefault(_alnum(w), w)
+    from .extract import HANDLE_GENERIC
+    for w in HANDLE_GENERIC:
+        vocab.setdefault(w, w)  # "culinanorge" splits as "culina norge" and finds CULINA NORGE AS
     for c in list(p.family_claims("social")):
-        if any(e.source_class == "open_knowledge_base" for e in c.evidence):
-            continue  # Wikidata: tied to the organisation number already
-        handle = str(c.value.get("handle", "")).split("?")[0].rstrip("/").split("/")[-1]
-        core = " ".join(name_tokens(re.sub(r"[_.\-]+", " ", re.sub(r"([a-z])([A-Z])", r"\1 \2", handle))))
-        if not core or len(core.replace(" ", "")) < 4 or core == own_core or core.replace(" ", "") == own_core.replace(" ", ""):
+        handle = handle_name(str(c.value.get("handle", "")))
+        h = _alnum(handle)
+        parts = split_words(h, set(vocab))
+        if parts:
+            core = " ".join(vocab.get(x, x) for x in parts)
+        else:
+            core = " ".join(name_tokens(re.sub(r"[_.\-]+", " ", re.sub(r"([a-z])([A-Z])", r"\1 \2", handle))))
+        if not core or len(h) < 4 or h == own_core.replace(" ", ""):
             continue
         f = await ctx.client.get("brreg", "https://data.brreg.no/enhetsregisteret/api/enheter?size=20&navn=" + quote(core),
                                  headers={"Accept": "application/json"}, check_robots=False, retries=1)
@@ -173,7 +185,7 @@ async def prune_sibling_handles(ctx: Context, p: Profile, ent: dict, orgnr: str,
         for r in rows:
             if r.get("organisasjonsnummer") in own or r.get("slettedato") or r.get("konkurs"):
                 continue
-            if " ".join(name_tokens(r.get("navn", ""))).replace(" ", "") == core.replace(" ", ""):
+            if "".join(name_tokens(r.get("navn", ""))) == h:
                 p.claims.remove(c)
                 p._keys.discard(c.key)
                 p.notes.setdefault("dropped_handles", []).append(f"{c.value.get('url')} is the name of {r.get('navn')} ({r.get('organisasjonsnummer')})")

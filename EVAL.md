@@ -114,3 +114,50 @@ domains, same-domain links).
 Re-running the same 20 companies into the same output directory produced **0 changes** and archived the
 previous envelopes. Unit tests cover new and ended roles with evidence on both sides, and facts kept
 from the previous run when their source fails.
+
+## Revision 2 (14 November 2026): Builderr's round result and two independent audit rounds
+
+Builderr's 13 November round (500 companies) checked 64 of our claims: 60 right, 4 about a different company
+(Facebook and Instagram `rogeraamodteiendom` given for ROGER AAMODT BYGG AS: the sister company ROGER AAMODT
+EIENDOM AS). Their other notes: no verified company news or job postings from us, and a summary that repeated the
+registry fields.
+
+We then ran independent audits on two runs of the revised agent: `eval/fresh-500.jsonl` (500 random companies
+never used before) and `eval/sites-dev.jsonl` (149 companies with a verified website, where news, jobs and profiles
+are dense). Each audit agent re-fetched every URL, checked the Brønnøysund entity and searched the register by the
+handle or brand words for a better-matching entity. Verdicts are in `eval/audit-r2/*-verdicts.jsonl`.
+
+| Round | Claims audited | Right | Wrong entity | Mislabelled | Unverifiable |
+|---|---:|---:|---:|---:|---:|
+| 1: websites (fresh-500) | 64 | 62 | 2 | 0 | 0 |
+| 1: social profiles (fresh-500) | 53 | 46 | 7 | 0 | 0 |
+| 1: contacts, sample (fresh-500) | 80 | 73 | 5 | 2 | 0 |
+| 1: news, jobs, ratings (fresh-500) | 60 | 54 | 1 | 5 | 0 |
+| 2: social profiles (sites-dev) | 127 | 113 | 3 | 5 dead links | 6 |
+| 2: contacts, sample (sites-dev) | 80 | 79 | 0 | 1 | 0 |
+| 2: news, jobs, ratings (sites-dev) | 97 | 90 | 1 | 6 | 0 |
+
+Every wrong or mislabelled claim became a rule and a regression test (`tests/test_audit_r2.py`,
+`tests/test_social.py`, `tests/test_news.py`), and `eval/regress-r2.jsonl` re-runs every flagged company:
+
+- **Sister companies.** A profile handle must be the company's own name or site name, optionally with its own name
+  words, its town, a legal form or a generic suffix (`rogeraamodteiendom`, `volt-service-as` and `frendeforsikring`
+  fail), and the register is searched for an active entity carrying exactly the handle's name (`culinanorge` is
+  CULINA NORGE AS). Wikidata profiles pass the same checks (a foundation registered c/o a law firm carried the firm's
+  handles in Wikidata).
+- **Websites shared by sister companies.** A site proven without the organisation number is withheld when another
+  entity declares that domain in the register (ryfylkebygg.no is RYFYLKE-BYGG AS's, not RYFYLKE BYGG PROSJEKT AS's)
+  or when sister companies named like the site's brand share our registered address (VOLT HARVEST I, II, III and
+  GROUP at one address).
+- **Group and foreign sites.** A site that prints another entity's organisation number or says it is run on
+  another's behalf contributes no profiles; a foreign group's site with no Norwegian phone, postcode or organisation
+  number contributes nothing but the website the register declares.
+- **Contacts and addresses.** Addresses must carry the postcode of the registered address or of a registered
+  workplace (a chain site lists other shops), "c/o" addresses are skipped, lead-ins are cut ("Gården har adresse"),
+  and a mailto link whose visible text shows a different address is ignored.
+- **News.** Default first posts in any language ("Witaj, świecie!"), paginated list pages, section titles
+  ("News - GasSecure"), dates shared by three or more posts (an import stamp), machine dates that disagree with the
+  date printed beside the headline (a migration stamp), and articles of fewer than 35 words are rejected.
+
+Not fixed: four Facebook pages and one Instagram account linked from the companies' own sites appear deleted, but
+Facebook and Instagram refuse automated reads, so the agent cannot tell a deleted page from a live one.

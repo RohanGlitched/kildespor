@@ -15,7 +15,9 @@ from pathlib import Path
 
 TEXT_METHODS = {"page_text_or_mailto", "page_text_or_tel", "address_pattern", "html_title", "meta_description", "news_listing_date",
                 "careers_page", "identity_proof_orgnr", "identity_proof_phone", "identity_proof_email", "identity_proof_name_address",
-                "identity_proof_legal_name", "identity_proof_legal_name_town", "identity_proof_role_holder_and_name"}
+                "identity_proof_legal_name", "identity_proof_legal_name_town", "identity_proof_role_holder_and_name",
+                "rss_item", "atom_entry", "wordpress_rest_api", "news_section_link"}
+TEXT_PREFIXES = ("article_",)
 
 
 def _norm(text: str) -> str:
@@ -43,11 +45,13 @@ def verify_run(envelopes: Path, archive: Path | None = None) -> dict:
                 continue
             hashed += 1
             method = ev.get("extraction_method", "")
-            if method not in TEXT_METHODS:
+            if method not in TEXT_METHODS and not method.startswith(TEXT_PREFIXES):
                 continue
             if sha not in cache:
                 raw = z.read(names[sha]).decode("utf-8", errors="replace")
-                cache[sha] = _norm(raw) + "|" + re.sub(r"[^0-9a-zæøå@.]+", "", html.unescape(raw).lower())
+                # pages drawn by JavaScript carry their text JSON-escaped inside the page data (ø, \/)
+                unesc = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), raw).replace("\\/", "/")
+                cache[sha] = "|".join((_norm(raw), re.sub(r"[^0-9a-zæøå@.]+", "", html.unescape(raw).lower()), _norm(unesc)))
             span = ev.get("claim_span", "")
             if ":" in span and method.startswith("identity_proof"):
                 span = span.split(":", 1)[1]
