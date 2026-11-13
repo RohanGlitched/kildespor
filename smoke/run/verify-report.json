@@ -1,7 +1,7 @@
 {
-  "evidence_records": 6557,
-  "hash_in_archive": 6557,
-  "text_spans_checked": 148,
-  "text_spans_found_in_page": 148,
+  "evidence_records": 6455,
+  "hash_in_archive": 6455,
+  "text_spans_checked": 105,
+  "text_spans_found_in_page": 105,
   "examples_of_misses": []
 }

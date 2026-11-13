@@ -1,9 +1,9 @@
 {
-  "run_id": "kildespor-20261019T205550Z",
+  "run_id": "kildespor-20261113T203852Z",
   "agent": "kildespor 0.1.0",
-  "started_at": "2026-10-19T20:55:50Z",
-  "completed_at": "2026-10-19T21:01:05Z",
-  "runtime_seconds": 311.7,
+  "started_at": "2026-11-13T20:38:52Z",
+  "completed_at": "2026-11-13T20:44:37Z",
+  "runtime_seconds": 353.6,
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -16,17 +16,17 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "claims": 6575,
-  "evidence_records": 6557,
+  "claims": 6504,
+  "evidence_records": 6455,
   "companies_with_claims_by_family": {
     "identity": 100,
     "financials": 100,
     "people": 100,
     "locations": 100,
-    "website": 13,
-    "contact": 39,
-    "social": 4,
-    "jobs": 1,
+    "website": 11,
+    "contact": 37,
+    "social": 3,
+    "jobs": 0,
     "activity": 100,
     "reviews": 0,
     "description": 100
@@ -47,20 +47,19 @@
     "website": {
       "blocked": 1,
       "ambiguous": 50,
-      "not_available": 36,
-      "available": 13
+      "not_available": 38,
+      "available": 11
     },
     "contact": {
-      "available": 39,
-      "not_available": 61
+      "available": 37,
+      "not_available": 63
     },
     "social": {
-      "not_available": 96,
-      "available": 4
+      "not_available": 97,
+      "available": 3
     },
     "jobs": {
-      "not_available": 99,
-      "available": 1
+      "not_available": 100
     },
     "activity": {
       "available": 100
@@ -74,29 +73,29 @@
   },
   "changes": 0,
   "operations": {
-    "requests": 11248,
-    "bytes": 228895396,
+    "requests": 12201,
+    "bytes": 333564568,
     "by_source": {
-      "robots": 362,
+      "robots": 355,
       "ted": 1,
+      "brreg": 412,
       "wikidata": 1,
-      "brreg": 411,
       "nav_jobs": 1,
-      "regnskap": 164,
+      "regnskap": 158,
       "ssb_klass": 1,
-      "nav_jobs_index": 9583,
+      "nav_jobs_index": 10563,
       "arbeidstilsynet": 2,
+      "website": 389,
+      "fagfolkguiden": 100,
       "smilefjes": 1,
-      "website": 414,
-      "fagfolkguiden": 101,
       "finanstilsynet": 100,
       "stotteregisteret": 100,
-      "website_feed": 6
+      "website_news": 17
     },
-    "p50_company_ms": 73708,
-    "p95_company_ms": 95574,
+    "p50_company_ms": 24192,
+    "p95_company_ms": 51062,
     "third_party_cost_usd": 0.0,
-    "dns_timeouts": 9
+    "dns_timeouts": 3
   },
   "sources": [
     {
@@ -106,21 +105,21 @@
       "prepare_seconds": 0.0,
       "companies_with_state_aid": 8,
       "companies_with_account_copies": 56,
-      "account_copy_rate_limit_pauses": 8
+      "account_copy_rate_limit_pauses": 2
     },
     {
       "name": "smilefjes",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 17.9,
-      "organisations_in_file": 8005,
+      "prepare_seconds": 13.8,
+      "organisations_in_file": 8007,
       "companies_matched": 1
     },
     {
       "name": "ted",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 3.5,
+      "prepare_seconds": 3.4,
       "queries": 1,
       "companies_with_awards": 1
     },
@@ -135,7 +134,7 @@
       "name": "arbeidstilsynet",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 14.3,
+      "prepare_seconds": 11.7,
       "companies_in_registers": 1,
       "matched": 1
     },
@@ -151,15 +150,21 @@
       "name": "nav_jobs",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 311.0,
-      "feed_pages": 155,
-      "ads_in_window": 42573,
-      "active_ads": 9419,
-      "detail_requests": 9428,
+      "prepare_seconds": 45.1,
+      "feed_pages": 356,
+      "ads_in_window": 86595,
+      "active_ads": 10186,
+      "walk_seconds": 44.7,
+      "detail_requests": 10207,
+      "public_ad_pages": 0,
       "companies_matched": 0,
       "ads_published": 0,
-      "window_days": 75,
-      "active_ads_indexed_by_orgnr": 9274,
+      "skipped_not_open": {},
+      "skip_examples": {},
+      "window_days": 180,
+      "active_ads_indexed_by_orgnr": 10041,
+      "index_coverage": 1.0,
+      "index_seconds": 308.3,
       "index_cache_hits": 0,
       "index_complete": true,
       "walker_errors": []
@@ -169,7 +174,7 @@
       "prepared": true,
       "error": null,
       "prepare_seconds": 0.0,
-      "companies_checked": 13,
+      "companies_checked": 11,
       "companies_with_targets": 0,
       "targets_read": 0,
       "companies_published": 0,
@@ -177,6 +182,9 @@
       "skipped_other_employer": 0,
       "skipped_duplicate": 0,
       "skipped_expired": 0,
+      "skipped_evergreen": 0,
+      "skipped_stale": 0,
+      "skipped_open_application": 0,
       "skipped_abroad": 0,
       "by_platform": {},
       "not_read": {}
@@ -185,9 +193,16 @@
       "name": "wikidata",
       "prepared": true,
       "error": null,
-      "prepare_seconds": 2.3,
+      "prepare_seconds": 2.8,
       "companies_with_items": 1,
-      "matched": 1
+      "matched": 1,
+      "dropped_not_named_like_the_company": 0,
+      "dropped_examples": []
     }
-  ]
+  ],
+  "viewer": {
+    "viewer": "/home/master/kt/final-out/smoke/viewer/index.html",
+    "hosted_example": "https://rohanglitched.github.io/kildespor/",
+    "open": "/home/master/kt/final-out/smoke/index.html"
+  }
 }

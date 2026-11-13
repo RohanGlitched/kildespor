@@ -1,9 +1,10 @@
-25/100 companies · 11239 requests · 311s
-50/100 companies · 11239 requests · 311s
-75/100 companies · 11239 requests · 311s
-100/100 companies · 11248 requests · 312s
+25/100 companies · 12201 requests · 354s
+50/100 companies · 12201 requests · 354s
+75/100 companies · 12201 requests · 354s
+100/100 companies · 12201 requests · 354s
+results viewer: open /home/master/kt/final-out/smoke/index.html in a browser (works from disk, no server)
 {
-  "run_id": "kildespor-20261019T205550Z",
+  "run_id": "kildespor-20261113T203852Z",
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -16,9 +17,10 @@
       "every_evidence_has_source_time_hash": true
     }
   },
-  "runtime_seconds": 311.7
+  "runtime_seconds": 353.6,
+  "viewer": {
+    "viewer": "/home/master/kt/final-out/smoke/viewer/index.html",
+    "hosted_example": "https://rohanglitched.github.io/kildespor/",
+    "open": "/home/master/kt/final-out/smoke/index.html"
+  }
 }
-
-real	5m16.408s
-user	0m50.272s
-sys	0m8.906s

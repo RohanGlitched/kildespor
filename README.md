@@ -64,30 +64,31 @@ envelopes, run report, the evidence archive and the `verify` report.
 | | Smoke test (100) | Development run (1,000) |
 |---|---:|---:|
 | Envelopes / validation | 100 / passed | 1000 / passed |
-| Facts | 6,575 | 63,654 |
-| Evidence records, hash found in archive | 6,557, all | 63,291 |
-| Quoted page spans found in the archived page | 148 of 148 | |
-| Runtime from a cold start (home connection) | 5.2 min | 8.6 min ¹ |
+| Facts | 6,504 | 63,157 |
+| Evidence records, hash found in archive | 6,455, all | 62,838, all |
+| Quoted page spans found in the archived page | 105 of 105 | 1,759 of 1,799 ¹ |
+| Runtime from a fresh clone (home connection, includes installing) | 5.9 min | 8.1 min ² |
 | Third-party cost | $0 | $0 |
 
-¹ NAV's job index builds in parallel with the research and is capped at 7 minutes; on a home connection it indexes
-about 5,400 of NAV's ~9,400 active ads in that time.
+¹ The rest are contact lines on pages drawn by JavaScript, whose text order differs from the raw HTML.
+² NAV's job index (every readable active ad of the last 180 days, about 10,000) builds in parallel with the research.
 
-Companies with at least one verified fact, by field family:
+Companies with at least one verified fact, by field family (a fresh clone of the submitted commit):
 
 | Family | Smoke test | 1,000 run |
 |---|---:|---:|
 | Legal identity and brand | 100 / 100 | 1000 / 1,000 |
 | Annual accounts and history | 100 / 100 | 999 / 1,000 |
-| Leadership and board | 100 / 100 | 999 / 1,000 |
-| Workplaces and addresses | 100 / 100 | 1000 / 1,000 |
-| Verified official website | 13 / 100 | 149 / 1,000 |
-| Company-published contact details | 39 / 100 | 445 / 1,000 |
-| Company-owned profiles | 4 / 100 | 89 / 1,000 |
-| Hiring | 1 / 100 | 27 / 1,000 |
-| Dated public activity | 100 / 100 | 1000 / 1,000 |
+| Leadership and board | 100 / 100 | 995 / 1,000 |
+| Workplaces and addresses | 100 / 100 | 997 / 1,000 |
+| Verified official website | 11 / 100 | 151 / 1,000 |
+| Company-published contact details | 37 / 100 | 445 / 1,000 |
+| Company-owned profiles | 3 / 100 | 73 / 1,000 |
+| Hiring (open postings or a real careers page) | 0 / 100 | 15 / 1,000 |
+| Dated company news from the company's own site | 2 / 100 | 32 / 1,000 |
+| Dated public activity (register events, awards, news) | 100 / 100 | 1000 / 1,000 |
 | Customer ratings | 0 / 100 | 21 / 1,000 |
-| What the company does | 100 / 100 | 1000 / 1,000 |
+| What the company does | 100 / 100 | 996 / 1,000 |
 
 A random company from the register is usually a small holding or property company with no website,
 so the share with a website or profiles reflects the population, not a crawl limit. In a hand-labelled
@@ -98,7 +99,11 @@ about 10 with a live site of their own ([eval/website-truth-80.jsonl](eval/websi
 wrong-company websites went from 16 to 10 to 3 to **0 of 70** across the version-1 audits, and every site
 proven by its own organisation number was correct in every audit. The October 20 rules were audited the same
 way (36 newly published sites): the 3 wrong matches the first audit found became rules and tests, and the
-second audit found **0 wrong**. What each audit found and the rule it produced: [EVAL.md](EVAL.md).
+second audit found **0 wrong**. For revision 2 (14 November), two more independent audit rounds re-checked
+561 published website, profile, contact, news and job claims on 649 companies, including a register search for
+a better-matching entity behind every profile handle; every wrong or mislabelled claim they found (a sister
+company's profile or site, a group site's contacts, default posts, list pages, import-stamped dates) became a
+rule and a regression test. What each audit found and the rule it produced: [EVAL.md](EVAL.md).
 
 ## Check the evidence yourself
 
